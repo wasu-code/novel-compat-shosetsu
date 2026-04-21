@@ -1,0 +1,12 @@
+ext {
+    extName = "Test Extension"
+    extClass = ".TestFactory"
+    extVersionCode = 1
+    isNsfw = false
+}
+
+apply from: "$rootDir/common.gradle"
+
+dependencies {
+    compileOnly("androidx.preference:preference-ktx:1.2.1")
+}

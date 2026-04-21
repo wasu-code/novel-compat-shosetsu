@@ -5,12 +5,10 @@
 build/
 /captures
 .idea/
-.vscode/
 *.iml
 repo/
 apk/
 gen
 generated-src/
 .kotlin
-/src/all/test/
-personal/
+*.jks
