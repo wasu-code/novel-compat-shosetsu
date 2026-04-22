@@ -1,7 +1,13 @@
 package eu.kanade.tachiyomi.extension.all.shosetsu
 
 import app.shosetsu.lib.Novel
+import eu.kanade.tachiyomi.source.model.SChapter
+import novelsurcery.utils.setAltTitles
 import eu.kanade.tachiyomi.source.model.SManga as SNovel
+
+// private val dateFormat = SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss.SSS'Z'", Locale.ROOT).apply {
+//    timeZone = TimeZone.getTimeZone("UTC")
+// }
 
 fun Novel.Status.toSNovelStatus(): Int = when (this) {
     Novel.Status.COMPLETED -> SNovel.COMPLETED
@@ -13,11 +19,18 @@ fun Novel.Status.toSNovelStatus(): Int = when (this) {
 fun Novel.Info.toSNovel(): SNovel = SNovel.create().apply {
     url = this@toSNovel.link
     title = this@toSNovel.title
-//        alternativeTitles
-    author = this@toSNovel.authors.toString()
-    artist = this@toSNovel.artists.toString()
-    genre = this@toSNovel.genres.toString().takeIf { it.isNotEmpty() } ?: tags.toString()
+    author = this@toSNovel.authors.joinToString()
+    artist = this@toSNovel.artists.joinToString()
+    genre = this@toSNovel.genres.joinToString().takeIf { it.isNotEmpty() } ?: tags.joinToString()
     description = this@toSNovel.description
     status = this@toSNovel.status.toSNovelStatus()
     thumbnail_url = imageURL
+    setAltTitles(this@toSNovel.alternativeTitles.asList())
+}
+
+fun Novel.Chapter.toSChapter(): SChapter = SChapter.create().apply {
+    url = link
+    name = title
+//    date_upload = SimpleDateFormat().tryParse(release) // first need to quess the format
+    chapter_number = order.toFloat()
 }
