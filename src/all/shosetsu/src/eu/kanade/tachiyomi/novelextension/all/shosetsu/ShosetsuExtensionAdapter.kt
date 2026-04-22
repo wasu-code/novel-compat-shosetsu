@@ -12,18 +12,15 @@ import androidx.preference.SwitchPreferenceCompat
 import app.shosetsu.lib.Novel
 import app.shosetsu.lib.lua.LuaExtension
 import eu.kanade.tachiyomi.source.ConfigurableSource
-import eu.kanade.tachiyomi.source.NovelSource
 import eu.kanade.tachiyomi.source.model.FilterList
 import eu.kanade.tachiyomi.source.model.Page
 import eu.kanade.tachiyomi.source.model.SChapter
-import eu.kanade.tachiyomi.source.online.HttpSource
 import keiyoushi.utils.getPreferences
+import kuchihige.source.NovelHttpSource
 import okhttp3.Request
 import okhttp3.Response
 import rx.Observable
 import app.shosetsu.lib.Filter as ShosetsuFilter
-import eu.kanade.tachiyomi.source.model.MangasPage as NovelsPage
-import eu.kanade.tachiyomi.source.model.SManga as SNovel
 
 /**
  * Adapts Shosetsu extension to [Source][eu.kanade.tachiyomi.source.Source]
@@ -32,8 +29,7 @@ import eu.kanade.tachiyomi.source.model.SManga as SNovel
  * @param language language in ISO 639-1 format or "all"
  */
 class ShosetsuExtensionAdapter(private val ext: LuaExtension, language: String) :
-    HttpSource(),
-    NovelSource,
+    NovelHttpSource(),
     ConfigurableSource {
 
     override val baseUrl: String = ext.baseURL
@@ -81,17 +77,17 @@ class ShosetsuExtensionAdapter(private val ext: LuaExtension, language: String) 
     }
 
     // TODO choose listing in settings
-    override fun fetchPopularManga(page: Int): Observable<NovelsPage> = Observable.just(getListing(0, page))
+    override fun fetchPopularNovels(page: Int): Observable<NovelsPage> = Observable.just(getListing(0, page))
 
-    override fun popularMangaParse(response: Response): NovelsPage = throw UnsupportedOperationException("Not used")
-    override fun popularMangaRequest(page: Int): Request = throw UnsupportedOperationException("Not used")
+    override fun popularNovelsParse(response: Response): NovelsPage = throw UnsupportedOperationException("Not used")
+    override fun popularNovelsRequest(page: Int): Request = throw UnsupportedOperationException("Not used")
 
     override fun fetchLatestUpdates(page: Int): Observable<NovelsPage> = Observable.just(getListing(1, page))
 
     override fun latestUpdatesParse(response: Response): NovelsPage = throw UnsupportedOperationException("Not used")
     override fun latestUpdatesRequest(page: Int): Request = throw UnsupportedOperationException("Not used")
 
-    override fun fetchSearchManga(page: Int, query: String, filters: FilterList): Observable<NovelsPage> {
+    override fun fetchSearchNovels(page: Int, query: String, filters: FilterList): Observable<NovelsPage> {
         if (!ext.hasSearch) throw UnsupportedOperationException("Search not supported in this extensions")
         // TODO ext.searchFiltersModel
 
@@ -107,16 +103,16 @@ class ShosetsuExtensionAdapter(private val ext: LuaExtension, language: String) 
         return Observable.just(NovelsPage(novels, ext.isSearchIncrementing))
     }
 
-    override fun searchMangaParse(response: Response): NovelsPage = throw UnsupportedOperationException("Not used")
-    override fun searchMangaRequest(
+    override fun searchNovelsParse(response: Response): NovelsPage = throw UnsupportedOperationException("Not used")
+    override fun searchNovelsRequest(
         page: Int,
         query: String,
         filters: FilterList,
     ): Request = throw UnsupportedOperationException("Not used")
 
-    override fun fetchChapterList(manga: SNovel): Observable<List<SChapter>> {
+    override fun fetchChapterList(novel: SNovel): Observable<List<SChapter>> {
         val chapters = ext
-            .parseNovel(manga.url, true)
+            .parseNovel(novel.url, true)
             .chapters
             .map { it.toSChapter() }
         return Observable.just(chapters)
@@ -124,12 +120,12 @@ class ShosetsuExtensionAdapter(private val ext: LuaExtension, language: String) 
 
     override fun chapterListParse(response: Response): List<SChapter> = throw UnsupportedOperationException("Not used")
 
-    override fun fetchMangaDetails(manga: SNovel): Observable<SNovel> {
-        val novel = ext.parseNovel(manga.url, false).toSNovel()
+    override fun fetchNovelDetails(novel: SNovel): Observable<SNovel> {
+        val novel = ext.parseNovel(novel.url, false).toSNovel()
         return Observable.just(novel)
     }
 
-    override fun mangaDetailsParse(response: Response): SNovel = throw UnsupportedOperationException("Not used")
+    override fun novelDetailsParse(response: Response): SNovel = throw UnsupportedOperationException("Not used")
 
     override fun fetchPageList(chapter: SChapter): Observable<List<Page>> {
         val page = Page(0, chapter.url)
