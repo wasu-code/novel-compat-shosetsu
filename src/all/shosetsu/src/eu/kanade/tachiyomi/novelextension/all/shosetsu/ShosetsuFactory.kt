@@ -1,4 +1,4 @@
-package eu.kanade.tachiyomi.extension.all.shosetsu
+package eu.kanade.tachiyomi.novelextension.all.shosetsu
 
 import android.util.Log
 import app.shosetsu.lib.ShosetsuSharedLib

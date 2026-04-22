@@ -1,4 +1,4 @@
-package eu.kanade.tachiyomi.extension.all.shosetsu
+package eu.kanade.tachiyomi.novelextension.all.shosetsu
 
 import app.shosetsu.lib.Novel
 import eu.kanade.tachiyomi.source.model.SChapter

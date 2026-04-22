@@ -1,4 +1,4 @@
-package eu.kanade.tachiyomi.extension.all.shosetsu
+package eu.kanade.tachiyomi.novelextension.all.shosetsu
 
 import android.content.Context
 import androidx.preference.CheckBoxPreference
@@ -81,16 +81,12 @@ class ShosetsuExtensionAdapter(private val ext: LuaExtension, language: String) 
     }
 
     // TODO choose listing in settings
-    override fun fetchPopularManga(page: Int): Observable<NovelsPage> {
-        return Observable.just(getListing(0, page))
-    }
+    override fun fetchPopularManga(page: Int): Observable<NovelsPage> = Observable.just(getListing(0, page))
 
     override fun popularMangaParse(response: Response): NovelsPage = throw UnsupportedOperationException("Not used")
     override fun popularMangaRequest(page: Int): Request = throw UnsupportedOperationException("Not used")
 
-    override fun fetchLatestUpdates(page: Int): Observable<NovelsPage> {
-        return Observable.just(getListing(1, page))
-    }
+    override fun fetchLatestUpdates(page: Int): Observable<NovelsPage> = Observable.just(getListing(1, page))
 
     override fun latestUpdatesParse(response: Response): NovelsPage = throw UnsupportedOperationException("Not used")
     override fun latestUpdatesRequest(page: Int): Request = throw UnsupportedOperationException("Not used")
