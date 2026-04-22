@@ -1,0 +1,31 @@
+ext {
+    extName = "Shosetsu"
+    extClass = ".ShosetsuFactory"
+    extVersionCode = 1
+    isNovel = true
+}
+
+apply from: "$rootDir/common.gradle"
+
+dependencies {
+    //noinspection UseTomlInstead
+    compileOnly("androidx.preference:preference-ktx:1.2.1")
+    //noinspection UseTomlInstead
+    implementation("app.shosetsu.lib:kotlin-lib:1.4.1") {
+        // already in host app,
+        // exclude so it doesn't cause conflicts
+        exclude group: "com.squareup.okhttp3", module: "okhttp"
+    }
+}
+
+repositories {
+    mavenCentral()
+    google()
+
+    maven {
+        url "https://gitlab.com/api/v4/groups/12585416/-/packages/maven"
+        content {
+            includeGroupAndSubgroups("app.shosetsu")
+        }
+    }
+}
