@@ -25,14 +25,20 @@ import app.shosetsu.lib.Filter as ShosetsuFilter
 import eu.kanade.tachiyomi.source.model.MangasPage as NovelsPage
 import eu.kanade.tachiyomi.source.model.SManga as SNovel
 
-class ShosetsuExtensionAdapter(private val ext: LuaExtension) :
+/**
+ * Adapts Shosetsu extension to [Source][eu.kanade.tachiyomi.source.Source]
+ *
+ * @property ext Shosetsu extension in Lua language
+ * @param language language in ISO 639-1 format or "all"
+ */
+class ShosetsuExtensionAdapter(private val ext: LuaExtension, language: String) :
     HttpSource(),
     NovelSource,
     ConfigurableSource {
 
     override val baseUrl: String = ext.baseURL
-    override val lang: String = "all" // TODO ISO 639-1 or "all"
-    override val supportsLatest: Boolean = false // TODO listing.size>1
+    override val lang: String = language
+    override val supportsLatest: Boolean = ext.listings.size > 1
     override val name: String = ext.name
 
     val preferences = getPreferences(id)
@@ -56,10 +62,14 @@ class ShosetsuExtensionAdapter(private val ext: LuaExtension) :
         ext.updateSetting(s.id, value)
     }
 
-    // TODO choose listing in settings, common function for fetchingListing(int) for popular/latest
-    override fun fetchPopularManga(page: Int): Observable<NovelsPage> {
-        // TODO: ext.searchFiltersModel
-        val listing = ext.listings[0]
+    /**
+     * Obtains listing with novels
+     *
+     * @param index Index of listing to retrieve novels from
+     * @param page
+     */
+    fun getListing(index: Int = 0, page: Int): NovelsPage {
+        val listing = ext.listings[index]
 
         val novels = listing.getListing(
             mapOf(
@@ -67,11 +77,20 @@ class ShosetsuExtensionAdapter(private val ext: LuaExtension) :
             ),
         ).map { it.toSNovel() }
 
-        return Observable.just(NovelsPage(novels, listing.isIncrementing))
+        return NovelsPage(novels, listing.isIncrementing)
+    }
+
+    // TODO choose listing in settings
+    override fun fetchPopularManga(page: Int): Observable<NovelsPage> {
+        return Observable.just(getListing(0, page))
     }
 
     override fun popularMangaParse(response: Response): NovelsPage = throw UnsupportedOperationException("Not used")
     override fun popularMangaRequest(page: Int): Request = throw UnsupportedOperationException("Not used")
+
+    override fun fetchLatestUpdates(page: Int): Observable<NovelsPage> {
+        return Observable.just(getListing(1, page))
+    }
 
     override fun latestUpdatesParse(response: Response): NovelsPage = throw UnsupportedOperationException("Not used")
     override fun latestUpdatesRequest(page: Int): Request = throw UnsupportedOperationException("Not used")
@@ -79,6 +98,8 @@ class ShosetsuExtensionAdapter(private val ext: LuaExtension) :
     override fun fetchSearchManga(page: Int, query: String, filters: FilterList): Observable<NovelsPage> {
         if (!ext.hasSearch) throw UnsupportedOperationException("Search not supported in this extensions")
         // TODO ext.searchFiltersModel
+
+//        ext.searchFiltersModel.forEach {  }
 
         val novels = ext.search(
             mapOf(
@@ -170,7 +191,14 @@ class ShosetsuExtensionAdapter(private val ext: LuaExtension) :
     }
 
     override fun setupPreferenceScreen(screen: PreferenceScreen) {
-        // TODO add info to restart app after changes
+        Preference::class.java
+            .getConstructor(Context::class.java)
+            .newInstance(screen.context)
+            .apply {
+                title = "After changing the following settings, restart the application"
+            }
+            .also(screen::addPreference)
+
         ext.settingsModel.forEach { s ->
             val preference: Preference = convertPreference(s, screen.context)
             screen.addPreference(preference)

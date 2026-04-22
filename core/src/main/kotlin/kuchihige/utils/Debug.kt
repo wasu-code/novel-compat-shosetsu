@@ -5,6 +5,7 @@ package kuchihige.utils
  *
  * Returns the receiver unchanged for easy chaining.
  */
+@Suppress("UNUSED")
 fun <T> T.log(tag: String = "Kuchihige"): T {
     val stack = Throwable().stackTrace
     // stack[0] is this line, so stack[1] is the T.log(...), stack[2] is the caller

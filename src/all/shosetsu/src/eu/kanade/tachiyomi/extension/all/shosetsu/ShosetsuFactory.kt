@@ -7,6 +7,7 @@ import eu.kanade.tachiyomi.source.Source
 import eu.kanade.tachiyomi.source.SourceFactory
 import okhttp3.OkHttpClient
 
+@Suppress("UNUSED")
 class ShosetsuFactory : SourceFactory {
 
     init {
@@ -36,7 +37,7 @@ class ShosetsuFactory : SourceFactory {
         }
 
         return listOf(
-            ShosetsuExtensionAdapter(extension),
+            ShosetsuExtensionAdapter(extension, "all"),
         )
     }
 }
