@@ -12,5 +12,4 @@ import eu.kanade.tachiyomi.source.model.FilterList
  *
  * @throws NoSuchElementException if no filter of type [T] exists in the list.
  */
-inline fun <reified T> FilterList.get(): T =
-    first { it is T } as T
+inline fun <reified T> FilterList.get(): T = first { it is T } as T
