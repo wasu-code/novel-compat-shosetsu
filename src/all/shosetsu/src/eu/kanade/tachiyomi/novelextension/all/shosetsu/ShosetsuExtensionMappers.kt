@@ -31,6 +31,6 @@ fun Novel.Info.toSNovel(): SNovel = SNovel.create().apply {
 fun Novel.Chapter.toSChapter(): SChapter = SChapter.create().apply {
     url = link
     name = title
-//    date_upload = SimpleDateFormat().tryParse(release) // first need to quess the format
+//    date_upload = SimpleDateFormat().tryParse(release) // first need to guess the format
     chapter_number = order.toFloat()
 }

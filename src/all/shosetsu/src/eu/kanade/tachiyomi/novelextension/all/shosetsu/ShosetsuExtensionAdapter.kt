@@ -1,6 +1,8 @@
 package eu.kanade.tachiyomi.novelextension.all.shosetsu
 
 import android.content.Context
+import android.os.Handler
+import android.os.Looper
 import androidx.preference.CheckBoxPreference
 import androidx.preference.DropDownPreference
 import androidx.preference.EditTextPreference
@@ -36,10 +38,16 @@ class ShosetsuExtensionAdapter(private val ext: LuaExtension, language: String) 
     override val lang: String = language
     override val supportsLatest: Boolean = ext.listings.size > 1
     override val name: String = ext.name
+    override val versionId: Int = ext.formatterID
 
     val preferences = getPreferences(id)
+    private val handler by lazy { Handler(Looper.getMainLooper()) }
 
     init {
+        updateSettings()
+    }
+
+    fun updateSettings() {
         ext.settingsModel.forEach { s ->
             updateSetting(s)
         }
@@ -183,17 +191,31 @@ class ShosetsuExtensionAdapter(private val ext: LuaExtension, language: String) 
     }
 
     override fun setupPreferenceScreen(screen: PreferenceScreen) {
-        Preference::class.java
-            .getConstructor(Context::class.java)
-            .newInstance(screen.context)
+        val extensionSettingsCat = PreferenceCategory(screen.context)
             .apply {
-                title = "After changing the following settings, restart the application"
+                title = "Extension settings"
+//                val meta = try {
+//                    ext.exMetaData
+//                } catch (_: Exception) {
+//                    null
+//                }
+//                summary = """
+//                    formattedID: ${ext.formatterID}
+//                    version ${meta?.version} (library version ${meta?.libVersion})
+//                    created by ${meta?.author}
+//                    depends on ${meta?.dependencies?.entries?.joinToString { it.key + " v" + it.value }}
+//                    ${meta?.repo}
+//                """.trimIndent()
             }
             .also(screen::addPreference)
 
         ext.settingsModel.forEach { s ->
             val preference: Preference = convertPreference(s, screen.context)
-            screen.addPreference(preference)
+            preference.setOnPreferenceChangeListener { _, _ ->
+                handler.post { updateSettings() }
+                true
+            }
+            extensionSettingsCat.addPreference(preference)
         }
     }
 
