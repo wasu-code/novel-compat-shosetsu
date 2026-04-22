@@ -1,4 +1,4 @@
-package keiyoushi.utils
+package novelsurcery.utils
 
 import eu.kanade.tachiyomi.source.model.SManga
 

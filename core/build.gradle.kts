@@ -10,7 +10,7 @@ android {
         minSdk = AndroidConfig.minSdk
     }
 
-    namespace = "keiyoushi.core"
+    namespace = "extensions.core"
 
     buildFeatures {
         resValues = false
