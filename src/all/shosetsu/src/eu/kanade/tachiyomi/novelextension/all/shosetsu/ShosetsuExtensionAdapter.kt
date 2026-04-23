@@ -68,6 +68,21 @@ class ShosetsuExtensionAdapter(private val ext: LuaExtension, language: String) 
     }
 
     /**
+     * Retrieve index of desired listing from shared preferences
+     *
+     * @param key The listing type to fetch. Can be either:
+     * - `PRIMARY` - always available
+     * - `SECONDARY` -0 may not exist
+     *
+     * @return index of desired listing or `0`
+     * @throws AssertionError if wrong key is provided
+     */
+    private fun getListingIndex(key: String = "PRIMARY"): Int {
+        assert(key in listOf("PRIMARY", "SECONDARY"))
+        return preferences.getString("LISTING_$key", "0")?.toInt() ?: 0
+    }
+
+    /**
      * Obtains listing with novels
      *
      * @param index Index of listing to retrieve novels from
@@ -87,13 +102,20 @@ class ShosetsuExtensionAdapter(private val ext: LuaExtension, language: String) 
         return NovelsPage(novels, hasNextPage)
     }
 
-    // TODO choose primary and secondary listing in settings
-    override fun fetchPopularNovels(page: Int): Observable<NovelsPage> = Observable.just(getListing(0, page))
+    override fun fetchPopularNovels(page: Int): Observable<NovelsPage> {
+        val listingIndex = getListingIndex("PRIMARY")
+        val listing = getListing(listingIndex, page)
+        return Observable.just(listing)
+    }
 
     override fun popularNovelsParse(response: Response): NovelsPage = throw UnsupportedOperationException("Not used")
     override fun popularNovelsRequest(page: Int): Request = throw UnsupportedOperationException("Not used")
 
-    override fun fetchLatestUpdates(page: Int): Observable<NovelsPage> = Observable.just(getListing(1, page))
+    override fun fetchLatestUpdates(page: Int): Observable<NovelsPage> {
+        val listingIndex = getListingIndex("SECONDARY")
+        val listing = getListing(listingIndex, page)
+        return Observable.just(listing)
+    }
 
     override fun latestUpdatesParse(response: Response): NovelsPage = throw UnsupportedOperationException("Not used")
     override fun latestUpdatesRequest(page: Int): Request = throw UnsupportedOperationException("Not used")
@@ -270,6 +292,33 @@ class ShosetsuExtensionAdapter(private val ext: LuaExtension, language: String) 
     }
 
     override fun setupPreferenceScreen(screen: PreferenceScreen) {
+        ListPreference(screen.context).apply {
+            key = "LISTING_PRIMARY"
+            title = "Primary listing"
+            entries = ext.listings.map { it.name }.toTypedArray()
+            entryValues = Array(ext.listings.size) { it.toString() }
+            setDefaultValue("0")
+            summary = """
+                Listing to be used when browsing Popular page
+                Selected: %s
+            """.trimIndent()
+        }.also(screen::addPreference)
+
+        if (ext.listings.size > 1) {
+            ListPreference(screen.context).apply {
+                key = "LISTING_SECONDARY"
+                title = "Secondary listing"
+                entries = ext.listings.map { it.name }.toTypedArray()
+                entryValues = Array(ext.listings.size) { it.toString() }
+                setDefaultValue("1")
+                summary = """
+                    Listing to be used when browsing Latest page
+                    Selected: %s
+                """.trimIndent()
+            }.also(screen::addPreference)
+        }
+
+        // ============== Add preferences provided by lua extension ==============
         val extensionSettingsCat = PreferenceCategory(screen.context)
             .apply {
                 title = "Extension settings"
