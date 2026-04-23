@@ -12,6 +12,7 @@ import androidx.preference.PreferenceCategory
 import androidx.preference.PreferenceScreen
 import androidx.preference.SwitchPreferenceCompat
 import app.shosetsu.lib.Novel
+import app.shosetsu.lib.exceptions.InvalidMetaDataException
 import app.shosetsu.lib.lua.LuaExtension
 import eu.kanade.tachiyomi.source.ConfigurableSource
 import eu.kanade.tachiyomi.source.model.FilterList
@@ -84,7 +85,7 @@ class ShosetsuExtensionAdapter(private val ext: LuaExtension, language: String) 
         return NovelsPage(novels, listing.isIncrementing)
     }
 
-    // TODO choose listing in settings
+    // TODO choose primary and secondary listing in settings
     override fun fetchPopularNovels(page: Int): Observable<NovelsPage> = Observable.just(getListing(0, page))
 
     override fun popularNovelsParse(response: Response): NovelsPage = throw UnsupportedOperationException("Not used")
@@ -95,18 +96,65 @@ class ShosetsuExtensionAdapter(private val ext: LuaExtension, language: String) 
     override fun latestUpdatesParse(response: Response): NovelsPage = throw UnsupportedOperationException("Not used")
     override fun latestUpdatesRequest(page: Int): Request = throw UnsupportedOperationException("Not used")
 
+    override fun getFilterList(): FilterList = FilterList(
+        ext.searchFiltersModel.flatMap { filter ->
+            when (filter) {
+                is ShosetsuFilter.FList -> filter.filters.map { it.toFilter() }
+                else -> listOf(filter.toFilter())
+            }
+        },
+    )
+
     override fun fetchSearchNovels(page: Int, query: String, filters: FilterList): Observable<NovelsPage> {
-        if (!ext.hasSearch) throw UnsupportedOperationException("Search not supported in this extensions")
-        // TODO ext.searchFiltersModel
+        // If query is not provided that is probably filtering, not search, and should still be handled
+        // Should filtering use .search or .getListing?
+        if (!ext.hasSearch && query.isNotEmpty()) throw UnsupportedOperationException("Search not supported in this extensions")
 
-//        ext.searchFiltersModel.forEach {  }
+        val filterMap = mutableMapOf<Int, Any>(
+            FID_QUERY to query,
+            FID_PAGE to page,
+        )
 
-        val novels = ext.search(
-            mapOf(
-                FID_QUERY to query,
-                FID_PAGE to page,
-            ),
-        ).map { it.toSNovel() }
+        val filterByName = ext.searchFiltersModel
+            .flatMap { filter ->
+                when (filter) {
+                    is ShosetsuFilter.FList -> filter.filters
+                    else -> listOf(filter)
+                }
+            }
+            .associateBy { it.name }
+
+        filters.forEach { f ->
+            val shosetsuFilter = filterByName[f.name] ?: return@forEach
+
+            when (shosetsuFilter) {
+                is ShosetsuFilter.Group<*> -> {
+                    val stateList = f.state as? List<*> ?: emptyList<Any?>()
+
+                    shosetsuFilter.filters.forEach { inner ->
+                        val match = stateList.firstOrNull { item ->
+                            (item as? ShosetsuFilter<*>)?.name == inner.name
+                        }
+
+                        val value = (match as? ShosetsuFilter<*>)?.state
+
+                        if (value != null) {
+                            filterMap[inner.id] = value
+                        }
+                    }
+                }
+
+                else -> {
+                    val value = f.state
+                    if (value != null) {
+                        filterMap[shosetsuFilter.id] = value
+                    }
+                }
+            }
+        }
+
+        val novels = ext.search(filterMap)
+            .map { it.toSNovel() }
 
         return Observable.just(NovelsPage(novels, ext.isSearchIncrementing))
     }
@@ -194,18 +242,18 @@ class ShosetsuExtensionAdapter(private val ext: LuaExtension, language: String) 
         val extensionSettingsCat = PreferenceCategory(screen.context)
             .apply {
                 title = "Extension settings"
-//                val meta = try {
-//                    ext.exMetaData
-//                } catch (_: Exception) {
-//                    null
-//                }
-//                summary = """
-//                    formattedID: ${ext.formatterID}
-//                    version ${meta?.version} (library version ${meta?.libVersion})
-//                    created by ${meta?.author}
-//                    depends on ${meta?.dependencies?.entries?.joinToString { it.key + " v" + it.value }}
-//                    ${meta?.repo}
-//                """.trimIndent()
+                summary = try {
+                    val meta = ext.exMetaData
+                    """
+                        formattedID:    ${ext.formatterID}
+                        version         ${meta.version} (library version ${meta.libVersion})
+                        created by      ${meta.author}
+                        depends on      ${meta.dependencies.entries.joinToString { it.key + " v" + it.value }}
+                        source          ${meta.repo}
+                    """.trimIndent()
+                } catch (_: InvalidMetaDataException) {
+                    "Extension provided invalid metadata"
+                }
             }
             .also(screen::addPreference)
 
