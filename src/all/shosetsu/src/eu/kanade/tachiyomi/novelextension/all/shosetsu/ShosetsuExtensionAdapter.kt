@@ -82,7 +82,9 @@ class ShosetsuExtensionAdapter(private val ext: LuaExtension, language: String) 
             ),
         ).map { it.toSNovel() }
 
-        return NovelsPage(novels, listing.isIncrementing)
+        val hasNextPage = listing.isIncrementing && novels.isNotEmpty()
+
+        return NovelsPage(novels, hasNextPage)
     }
 
     // TODO choose primary and secondary listing in settings
@@ -156,7 +158,9 @@ class ShosetsuExtensionAdapter(private val ext: LuaExtension, language: String) 
         val novels = ext.search(filterMap)
             .map { it.toSNovel() }
 
-        return Observable.just(NovelsPage(novels, ext.isSearchIncrementing))
+        val hasNextPage = ext.isSearchIncrementing && novels.isNotEmpty()
+
+        return Observable.just(NovelsPage(novels, hasNextPage))
     }
 
     override fun searchNovelsParse(response: Response): NovelsPage = throw UnsupportedOperationException("Not used")
