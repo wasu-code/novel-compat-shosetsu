@@ -204,42 +204,69 @@ class ShosetsuExtensionAdapter(private val ext: LuaExtension, language: String) 
     }
 
     fun convertPreference(s: ShosetsuFilter<*>, context: Context): Preference = when (s) {
-        is ShosetsuFilter.Text, is ShosetsuFilter.Password -> EditTextPreference(context).apply {
+        is ShosetsuFilter.Text,
+        is ShosetsuFilter.Password,
+        -> EditTextPreference(context).apply {
             setDefaultValue("")
         }
+
         is ShosetsuFilter.Switch -> SwitchPreferenceCompat(context).apply {
             setDefaultValue(false)
         }
+
         is ShosetsuFilter.Checkbox -> CheckBoxPreference(context).apply {
             setDefaultValue(false)
         }
+
         is ShosetsuFilter.Dropdown -> DropDownPreference(context).apply {
             entries = s.choices.toTypedArray()
             entryValues = Array(s.choices.size) { it.toString() }
             setDefaultValue("0")
         }
+
         is ShosetsuFilter.RadioGroup -> ListPreference(context).apply {
             entries = s.choices.toTypedArray()
             entryValues = Array(s.choices.size) { it.toString() }
             setDefaultValue("0")
         }
+
         is ShosetsuFilter.TriState -> DropDownPreference(context).apply {
             entries = arrayOf("Default", "Include", "Exclude")
             entryValues = arrayOf("0", "1", "2")
             setDefaultValue("0")
         }
-        is ShosetsuFilter.Header, is ShosetsuFilter.Separator -> PreferenceCategory(context)
-        is ShosetsuFilter.FList -> PreferenceCategory(context).apply {
-            s.filters.map { convertPreference(it, context) }
-                .forEach(::addPreference)
-        }
-        is ShosetsuFilter.Group<*> -> PreferenceCategory(context).apply {
-            s.filters.map { convertPreference(it, context) }
-                .forEach(::addPreference)
-        }
+
+        is ShosetsuFilter.Header,
+        is ShosetsuFilter.Separator,
+        -> PreferenceCategory(context)
+
+        is ShosetsuFilter.FList,
+        is ShosetsuFilter.Group<*>,
+        -> PreferenceCategory(context)
     }.apply {
         key = s.id.toString()
         title = s.name
+    }
+
+    fun attachChildren(
+        parent: PreferenceCategory,
+        s: ShosetsuFilter<*>,
+        context: Context,
+    ) {
+        val children = when (s) {
+            is ShosetsuFilter.FList -> s.filters
+            is ShosetsuFilter.Group<*> -> s.filters
+            else -> emptyList()
+        }
+
+        children
+            .map { convertPreference(it, context) }
+            .forEach { child ->
+                if (child is PreferenceCategory) {
+                    attachChildren(child, children.first { it.id.toString() == child.key }, context)
+                }
+                parent.addPreference(child)
+            }
     }
 
     override fun setupPreferenceScreen(screen: PreferenceScreen) {
@@ -263,10 +290,16 @@ class ShosetsuExtensionAdapter(private val ext: LuaExtension, language: String) 
 
         ext.settingsModel.forEach { s ->
             val preference: Preference = convertPreference(s, screen.context)
+
+            if (preference is PreferenceCategory) {
+                attachChildren(preference, s, screen.context)
+            }
+
             preference.setOnPreferenceChangeListener { _, _ ->
                 handler.post { updateSettings() }
                 true
             }
+
             extensionSettingsCat.addPreference(preference)
         }
     }
