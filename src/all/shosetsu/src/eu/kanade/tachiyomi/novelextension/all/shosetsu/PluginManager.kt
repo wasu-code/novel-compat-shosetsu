@@ -47,7 +47,7 @@ object PluginManager {
 
     fun getExtensionFile(identity: ExtensionIdentity): File {
         requireInit()
-        return File(srcDir, "${identity.id}.lua")
+        return File(srcDir, "${identity.lang}/${identity.id}.lua")
     }
 
     fun getLibraryFile(name: String): File {
@@ -132,11 +132,17 @@ object PluginManager {
 
     fun getInstalledExtensions(): List<File> {
         requireInit()
-        return srcDir.listFiles { f -> f.isFile && f.extension == "lua" }?.toList() ?: emptyList()
+        return srcDir
+            .walkTopDown()
+            .filter { it.isFile && it.extension == "lua" }
+            .toList()
     }
 
     fun getInstalledLibraries(): List<File> {
         requireInit()
-        return libDir.listFiles { f -> f.isFile && f.extension == "lua" }?.toList() ?: emptyList()
+        return libDir
+            .listFiles { it.isFile && it.extension == "lua" }
+            ?.toList()
+            ?: emptyList()
     }
 }

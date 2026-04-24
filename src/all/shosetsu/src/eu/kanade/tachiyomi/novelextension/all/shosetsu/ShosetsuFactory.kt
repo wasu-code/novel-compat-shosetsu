@@ -50,31 +50,43 @@ class ShosetsuFactory : SourceFactory {
 
     override fun createSources(): List<Source> {
         PluginManager.init(context.filesDir)
-        val extensionFiles = PluginManager.getInstalledExtensions().log()
 
-        // Use extension class loader so that shosetsu lib sees its resources,
-        // not resources of the host app (necessary for .lua resources)
-        val original = Thread.currentThread().contextClassLoader
-        val extensions = try {
-            val myLoader = javaClass.classLoader
-            Thread.currentThread().contextClassLoader = myLoader
-
-            // Call into the library here
-            extensionFiles.map {
-                LuaExtension(it)
-            } + LuaExtension(AAAA, "AAAAExt")
-        } finally {
-            Thread.currentThread().contextClassLoader = original
+        val extensions = withExtensionClassLoader {
+            PluginManager.getInstalledExtensions()
+                .map { file ->
+                    val lang = file.parentFile?.name ?: "all"
+                    LuaExtension(file) to lang
+                }
+                .plus(LuaExtension(AAAA, "AAAAExt") to "all")
         }
 
-        return extensions.mapNotNull {
-            try {
-                ShosetsuExtensionAdapter(it, "all") // TODO language from filepath?
-            } catch (e: Exception) {
-                Log.e("Shosetsu", "Loading extension failed", e)
-                null
-            }
-        } + ShosetsuSettings()
+        return extensions
+            .mapNotNull(::safeCreateSource)
+            .plus(ShosetsuSettings())
+    }
+
+    // Use extension class loader so that shosetsu lib sees its resources,
+    // not resources of the host app (necessary for .lua resources)
+    inline fun <T> withExtensionClassLoader(block: () -> T): T {
+        val thread = Thread.currentThread()
+        val original = thread.contextClassLoader
+
+        return try {
+            thread.contextClassLoader = javaClass.classLoader
+            block()
+        } finally {
+            thread.contextClassLoader = original
+        }
+    }
+
+    private fun safeCreateSource(pair: Pair<LuaExtension, String>): Source? {
+        val (ext, lang) = pair
+        return try {
+            ShosetsuExtensionAdapter(ext, lang)
+        } catch (e: Exception) {
+            Log.e("Shosetsu", "Loading extension failed", e)
+            null
+        }
     }
 }
 
