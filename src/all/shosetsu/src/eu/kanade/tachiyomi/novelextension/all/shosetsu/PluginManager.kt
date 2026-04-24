@@ -1,0 +1,142 @@
+package eu.kanade.tachiyomi.novelextension.all.shosetsu
+
+import android.util.Log
+import app.shosetsu.lib.json.RepoExtension
+import java.io.File
+import java.net.HttpURLConnection
+import java.net.URL
+
+data class ShosetsuExtension(
+    val extension: RepoExtension,
+    val installed: Boolean,
+    /** Set to `true` when the installed plugin is not available anymore in remote repo */
+    val orphaned: Boolean? = null,
+    val updateAvailable: Boolean? = null,
+)
+
+data class ExtensionIdentity(
+    val repoUrl: String,
+    val lang: String,
+    val fileName: String,
+) {
+    val id: Int get() = listOf(repoUrl, lang, fileName).joinToString("\u0000").hashCode()
+}
+
+fun RepoExtension.toIdentity(repoUrl: String) = ExtensionIdentity(
+    repoUrl = repoUrl.trimEnd('/'),
+    lang = lang,
+    fileName = fileName,
+)
+
+object PluginManager {
+    private lateinit var srcDir: File
+    private lateinit var libDir: File
+
+    fun init(filesDir: File) {
+        srcDir = File(filesDir, "shosetsu/src").also { it.mkdirs() }
+        libDir = File(filesDir, "shosetsu/lib").also { it.mkdirs() }
+    }
+
+    private fun requireInit() {
+        check(::srcDir.isInitialized) {
+            "PluginManager.init(filesDir) must be called before using PluginManager"
+        }
+    }
+
+    // === Paths ================================================================
+
+    fun getExtensionFile(identity: ExtensionIdentity): File {
+        requireInit()
+        return File(srcDir, "${identity.id}.lua")
+    }
+
+    fun getLibraryFile(name: String): File {
+        requireInit()
+        return File(libDir, "$name.lua")
+    }
+
+    fun isInstalled(identity: ExtensionIdentity): Boolean = getExtensionFile(identity).exists()
+
+    fun isLibraryInstalled(name: String): Boolean = getLibraryFile(name).exists()
+
+    // === Download ============================================================
+
+    fun downloadExtension(identity: ExtensionIdentity): File? {
+        requireInit()
+        val remoteUrl = URL(
+            URL(identity.repoUrl + "/"),
+            "src/${identity.lang}/${identity.fileName}.lua",
+        )
+        return download(remoteUrl, getExtensionFile(identity))
+    }
+
+    fun downloadLibrary(repoUrl: String, name: String): File? {
+        requireInit()
+        val remoteUrl = URL(URL(repoUrl.trimEnd('/') + "/"), "lib/$name.lua")
+        return download(remoteUrl, getLibraryFile(name))
+    }
+
+    private fun download(remoteUrl: URL, destFile: File): File? {
+        val tempFile = File(destFile.absolutePath + ".tmp")
+        return try {
+            destFile.parentFile?.mkdirs()
+
+            val connection = (remoteUrl.openConnection() as HttpURLConnection).apply {
+                connectTimeout = 15_000
+                readTimeout = 15_000
+            }
+
+            try {
+                val code = connection.responseCode
+                if (code != HttpURLConnection.HTTP_OK) error("HTTP $code for $remoteUrl")
+                connection.inputStream.use { input ->
+                    tempFile.outputStream().use(input::copyTo)
+                }
+            } finally {
+                connection.disconnect()
+            }
+
+            if (destFile.exists()) destFile.delete()
+            check(tempFile.renameTo(destFile)) { "Failed to rename temp file to $destFile" }
+            destFile.setReadOnly()
+            destFile
+        } catch (e: Exception) {
+            Log.e("PluginManager", "Download failed: $remoteUrl", e)
+            tempFile.delete()
+            null
+        }
+    }
+
+    // === Delete ===============================================================
+
+    fun deleteExtension(identity: ExtensionIdentity): Boolean = getExtensionFile(identity).let { it.exists() && it.delete() }
+
+    fun deleteLibrary(name: String): Boolean = getLibraryFile(name).let { it.exists() && it.delete() }
+
+    fun deleteAllExtensions(): Boolean {
+        requireInit()
+        return srcDir.deleteRecursively().also { srcDir.mkdirs() }
+    }
+
+    fun deleteAllLibraries(): Boolean {
+        requireInit()
+        return libDir.deleteRecursively().also { libDir.mkdirs() }
+    }
+
+    fun deleteAll(): Boolean {
+        requireInit()
+        return deleteAllExtensions() && deleteAllLibraries()
+    }
+
+    // === Installed =============================================================
+
+    fun getInstalledExtensions(): List<File> {
+        requireInit()
+        return srcDir.listFiles { f -> f.isFile && f.extension == "lua" }?.toList() ?: emptyList()
+    }
+
+    fun getInstalledLibraries(): List<File> {
+        requireInit()
+        return libDir.listFiles { f -> f.isFile && f.extension == "lua" }?.toList() ?: emptyList()
+    }
+}

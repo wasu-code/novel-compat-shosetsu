@@ -8,6 +8,7 @@ import androidx.preference.EditTextPreference
 import androidx.preference.Preference
 import androidx.preference.PreferenceCategory
 import androidx.preference.PreferenceScreen
+import app.shosetsu.lib.Version
 import app.shosetsu.lib.json.RepoExtension
 import eu.kanade.tachiyomi.source.ConfigurableSource
 import eu.kanade.tachiyomi.source.Source
@@ -15,6 +16,8 @@ import eu.kanade.tachiyomi.source.model.Page
 import eu.kanade.tachiyomi.source.model.SChapter
 import eu.kanade.tachiyomi.source.model.SManga
 import rx.Observable
+
+fun Version.toVersionString(): String = "$major.$minor.$patch"
 
 class ShosetsuSettings :
     Source,
@@ -117,14 +120,14 @@ class ShosetsuSettings :
         ext: RepoExtension,
     ): Preference = newPreference(context) {
         title = ext.name
-        summary = buildString {
-            append(ext.lang)
-            append(" • v")
-            append(ext.version.let { "${it.major}.${it.minor}.${it.patch}" })
-        }
+        summary = """
+            ${ext.lang} • ${ext.version.toVersionString()}
+        """.trimIndent()
         setOnPreferenceClickListener {
             val identity = ext.toIdentity(repoUrl)
-            // PluginManager.downloadExtension(identity)
+            launchIO {
+                PluginManager.downloadExtension(identity)
+            }
             true
         }
     }

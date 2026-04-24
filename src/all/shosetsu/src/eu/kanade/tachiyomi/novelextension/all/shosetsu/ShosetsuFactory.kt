@@ -20,6 +20,8 @@ class ShosetsuFactory : SourceFactory {
     private val handler by lazy { Handler(Looper.getMainLooper()) }
     private val hostContext by lazy { Injekt.get<Application>() }
 
+    private val context = Injekt.get<Application>()
+
     init {
         ShosetsuSharedLib.httpClient = OkHttpClient()
 
@@ -47,6 +49,9 @@ class ShosetsuFactory : SourceFactory {
     }
 
     override fun createSources(): List<Source> {
+        PluginManager.init(context.filesDir)
+        val extensionFiles = PluginManager.getInstalledExtensions().log()
+
         // Use extension class loader so that shosetsu lib sees its resources,
         // not resources of the host app (necessary for .lua resources)
         val original = Thread.currentThread().contextClassLoader
@@ -55,19 +60,18 @@ class ShosetsuFactory : SourceFactory {
             Thread.currentThread().contextClassLoader = myLoader
 
             // Call into the library here
-            listOf(
-                LuaExtension(AAAA, "AAAAExt"),
-//                LuaExtension(BBBB, "BBBBExt"),
-            )
+            extensionFiles.map {
+                LuaExtension(it)
+            } + LuaExtension(AAAA, "AAAAExt")
         } finally {
             Thread.currentThread().contextClassLoader = original
         }
 
         return extensions.mapNotNull {
             try {
-                ShosetsuExtensionAdapter(it, "all")
+                ShosetsuExtensionAdapter(it, "all") // TODO language from filepath?
             } catch (e: Exception) {
-                e.log()
+                Log.e("Shosetsu", "Loading extension failed", e)
                 null
             }
         } + ShosetsuSettings()
