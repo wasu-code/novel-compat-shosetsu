@@ -327,18 +327,6 @@ class ShosetsuExtensionAdapter(private val ext: LuaExtension, language: String) 
         val extensionSettingsCat = PreferenceCategory(screen.context)
             .apply {
                 title = "Extension settings"
-                summary = try {
-                    val meta = ext.exMetaData
-                    """
-                        formattedID:    ${ext.formatterID}
-                        version         ${meta.version} (library version ${meta.libVersion})
-                        created by      ${meta.author}
-                        depends on      ${meta.dependencies.entries.joinToString { it.key + " v" + it.value }}
-                        source          ${meta.repo}
-                    """.trimIndent()
-                } catch (_: InvalidMetaDataException) {
-                    "Extension provided invalid metadata"
-                }
             }
             .also(screen::addPreference)
 
@@ -356,6 +344,28 @@ class ShosetsuExtensionAdapter(private val ext: LuaExtension, language: String) 
 
             extensionSettingsCat.addPreference(preference)
         }
+
+        Preference::class.java
+            .getConstructor(Context::class.java)
+            .newInstance(screen.context)
+            .apply {
+                title = "Metadata"
+                summary = try {
+                    val meta = ext.exMetaData
+                    """
+                        internal ID: ${ext.formatterID}
+                        version: ${meta.version} (library version ${meta.libVersion})
+                        created by: ${meta.author}
+                        depends on: ${meta.dependencies.entries.joinToString { it.key + " v" + it.value }}
+                        source: ${meta.repo}
+                    """.trimIndent()
+                } catch (_: InvalidMetaDataException) {
+                    "Can't load metadata for this extension"
+                }
+                setEnabled(false)
+                setIconReflect(android.R.drawable.ic_menu_info_details)
+            }
+            .also(screen::addPreference)
     }
 
     companion object {
