@@ -79,7 +79,9 @@ class ShosetsuExtensionAdapter(private val ext: LuaExtension, language: String) 
      */
     private fun getListingIndex(key: String = "PRIMARY"): Int {
         assert(key in listOf("PRIMARY", "SECONDARY"))
-        return preferences.getString("LISTING_$key", "0")?.toInt() ?: 0
+        val desiredListingIndex = preferences.getString("LISTING_$key", "0")?.toInt() ?: 0
+        if (desiredListingIndex > ext.listings.size - 1) return 0
+        return desiredListingIndex
     }
 
     /**
@@ -219,7 +221,7 @@ class ShosetsuExtensionAdapter(private val ext: LuaExtension, language: String) 
     override fun imageUrlParse(response: Response): String = throw UnsupportedOperationException("Not used")
 
     override suspend fun fetchPageText(page: Page): String {
-        val content = ext.getPassage(page.url).toString()
+        val content = String(ext.getPassage(page.url))
         return when (ext.chapterType) {
             Novel.ChapterType.HTML -> content
             Novel.ChapterType.STRING -> """<pre style="white-space: pre-wrap">$content</pre>"""
@@ -293,19 +295,20 @@ class ShosetsuExtensionAdapter(private val ext: LuaExtension, language: String) 
     }
 
     override fun setupPreferenceScreen(screen: PreferenceScreen) {
-        ListPreference(screen.context).apply {
-            key = "LISTING_PRIMARY"
-            title = "Primary listing"
-            entries = ext.listings.map { it.name }.toTypedArray()
-            entryValues = Array(ext.listings.size) { it.toString() }
-            setDefaultValue("0")
-            summary = """
+
+        if (ext.listings.size > 1) {
+            ListPreference(screen.context).apply {
+                key = "LISTING_PRIMARY"
+                title = "Primary listing"
+                entries = ext.listings.map { it.name }.toTypedArray()
+                entryValues = Array(ext.listings.size) { it.toString() }
+                setDefaultValue("0")
+                summary = """
                 Listing to be used when browsing Popular page
                 Selected: %s
             """.trimIndent()
-        }.also(screen::addPreference)
+            }.also(screen::addPreference)
 
-        if (ext.listings.size > 1) {
             ListPreference(screen.context).apply {
                 key = "LISTING_SECONDARY"
                 title = "Secondary listing"
