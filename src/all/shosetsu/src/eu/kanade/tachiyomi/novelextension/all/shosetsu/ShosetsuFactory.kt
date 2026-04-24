@@ -4,12 +4,13 @@ import android.app.Application
 import android.os.Handler
 import android.os.Looper
 import android.util.Log
+import android.webkit.WebSettings
 import app.shosetsu.lib.ShosetsuSharedLib
 import app.shosetsu.lib.lua.LuaExtension
 import app.shosetsu.lib.lua.ShosetsuLuaLib
+import app.shosetsu.lib.lua.shosetsuGlobals
 import eu.kanade.tachiyomi.source.Source
 import eu.kanade.tachiyomi.source.SourceFactory
-import kuchihige.utils.log
 import okhttp3.OkHttpClient
 import uy.kohesive.injekt.Injekt
 import uy.kohesive.injekt.api.get
@@ -20,8 +21,6 @@ class ShosetsuFactory : SourceFactory {
     private val handler by lazy { Handler(Looper.getMainLooper()) }
     private val hostContext by lazy { Injekt.get<Application>() }
 
-    private val context = Injekt.get<Application>()
-
     init {
         ShosetsuSharedLib.httpClient = OkHttpClient()
 
@@ -29,27 +28,26 @@ class ShosetsuFactory : SourceFactory {
             Log.d("Shosetsu (ext)", "[$extensionName] $log")
         }
 
-//        ShosetsuSharedLib.shosetsuHeaders = arrayOf(
-//            "User-Agent" to "Tsundoku/${AppInfo.getVersionName()} (Shosetsu Extension; ShosetsuLib/1.4.1)"
-//        )
+        ShosetsuSharedLib.shosetsuHeaders = arrayOf(
+            "User-Agent" to WebSettings.getDefaultUserAgent(hostContext), // "Tsundoku/${AppInfo.getVersionName()} (Shosetsu Extension; ShosetsuLib/1.4.1)"
+        )
 
         ShosetsuLuaLib.libLoader = libLoader@{ name ->
             Log.i("LuaLibLoader", "Loading ($name)")
             try {
-//                val result = runBlocking { extLibRepository.loadExtLibrary(name) }
-//                val l =
-//                    shosetsuGlobals().load(result, "lib($name)")
-//                l.call()
-                null
+                val result = PluginManager.getLibraryFile(name)
+                val l =
+                    shosetsuGlobals().load(result.readText(), "lib($name)")
+                l.call()
             } catch (e: Throwable) {
-                e.log()
+                Log.e("Shosetsu", "Failed to load library $name", e)
                 null
             }
-        } // TODO
+        }
     }
 
     override fun createSources(): List<Source> {
-        PluginManager.init(context.filesDir)
+        PluginManager.init(hostContext.filesDir)
 
         val extensions = withExtensionClassLoader {
             PluginManager.getInstalledExtensions()

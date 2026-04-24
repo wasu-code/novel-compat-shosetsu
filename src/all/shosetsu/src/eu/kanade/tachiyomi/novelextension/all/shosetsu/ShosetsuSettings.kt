@@ -101,11 +101,13 @@ class ShosetsuSettings :
 
             launchIO {
                 try {
-                    val plugins = RepositoryManager.getRepoPlugins(repoUrl)
+                    val repo = RepositoryManager.getRepo(repoUrl)
+                    val extensions = repo.extensions
+                    val libraries = repo.libraries
 
                     runOnMain {
                         category.removeAll()
-                        if (plugins.isEmpty()) {
+                        if (extensions.isEmpty()) {
                             category.addPreference(
                                 newPreference(context) {
                                     title = "No extensions found"
@@ -113,10 +115,14 @@ class ShosetsuSettings :
                                 },
                             )
                         } else {
-                            plugins.forEach { ext ->
+                            extensions.forEach { ext ->
                                 category.addPreference(createExtensionPreference(context, repoUrl, ext))
                             }
                         }
+                    }
+
+                    libraries.forEach { lib ->
+                        PluginManager.downloadLibrary(repoUrl, lib.name, lib.version)
                     }
                 } catch (e: Exception) {
                     Log.e("ShosetsuSettings", "Failed to load $repoUrl", e)

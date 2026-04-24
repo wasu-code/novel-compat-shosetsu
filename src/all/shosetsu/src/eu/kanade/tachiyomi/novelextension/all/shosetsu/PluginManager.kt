@@ -1,7 +1,9 @@
 package eu.kanade.tachiyomi.novelextension.all.shosetsu
 
 import android.util.Log
+import app.shosetsu.lib.Version
 import app.shosetsu.lib.json.RepoExtension
+import app.shosetsu.lib.lua.LuaLibrary
 import java.io.File
 import java.net.HttpURLConnection
 import java.net.URL
@@ -70,8 +72,15 @@ object PluginManager {
         return download(remoteUrl, getExtensionFile(identity))
     }
 
-    fun downloadLibrary(repoUrl: String, name: String): File? {
+    fun downloadLibrary(repoUrl: String, name: String, version: Version): File? {
         requireInit()
+        val libFile = getLibraryFile(name)
+        if (libFile.exists()) {
+            // compare versions
+            val currentVersion = LuaLibrary(libFile).libMetaData.version
+            if (version >= currentVersion) return libFile
+        }
+
         val remoteUrl = URL(URL(repoUrl.trimEnd('/') + "/"), "lib/$name.lua")
         return download(remoteUrl, getLibraryFile(name))
     }
