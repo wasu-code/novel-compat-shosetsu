@@ -271,6 +271,8 @@ class ShosetsuExtensionAdapter(private val ext: LuaExtension, language: String) 
     }.apply {
         key = s.id.toString()
         title = s.name
+        // ensure even long text can be read by user
+        if (s.name.length > 20) summary = s.name
     }
 
     fun attachChildren(
@@ -295,7 +297,6 @@ class ShosetsuExtensionAdapter(private val ext: LuaExtension, language: String) 
     }
 
     override fun setupPreferenceScreen(screen: PreferenceScreen) {
-
         if (ext.listings.size > 1) {
             ListPreference(screen.context).apply {
                 key = "LISTING_PRIMARY"
@@ -306,7 +307,7 @@ class ShosetsuExtensionAdapter(private val ext: LuaExtension, language: String) 
                 summary = """
                 Listing to be used when browsing Popular page
                 Selected: %s
-            """.trimIndent()
+                """.trimIndent()
             }.also(screen::addPreference)
 
             ListPreference(screen.context).apply {
