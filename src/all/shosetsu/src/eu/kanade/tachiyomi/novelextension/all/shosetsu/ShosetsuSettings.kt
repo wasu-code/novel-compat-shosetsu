@@ -1,9 +1,14 @@
 package eu.kanade.tachiyomi.novelextension.all.shosetsu
 
+import android.app.AlertDialog
+import android.app.Application
 import android.content.Context
+import android.content.Intent
 import android.os.Handler
 import android.os.Looper
 import android.util.Log
+import android.widget.Toast
+import androidx.core.net.toUri
 import androidx.preference.EditTextPreference
 import androidx.preference.Preference
 import androidx.preference.PreferenceCategory
@@ -16,6 +21,8 @@ import eu.kanade.tachiyomi.source.model.Page
 import eu.kanade.tachiyomi.source.model.SChapter
 import eu.kanade.tachiyomi.source.model.SManga
 import rx.Observable
+import uy.kohesive.injekt.Injekt
+import uy.kohesive.injekt.api.get
 
 fun Version.toVersionString(): String = "$major.$minor.$patch"
 
@@ -28,6 +35,7 @@ class ShosetsuSettings :
     override fun toString(): String = name
 
     private val mainHandler = Handler(Looper.getMainLooper())
+    private val hostContext by lazy { Injekt.get<Application>() }
 
     private fun launchIO(block: () -> Unit) {
         Thread(block).start()
@@ -35,6 +43,19 @@ class ShosetsuSettings :
 
     private fun runOnMain(block: () -> Unit) {
         mainHandler.post(block)
+    }
+
+    /**
+     * Reload extensions from disk so that newly installed Shosetsu extensions appear in the host app.
+     */
+    fun reloadExtensions() {
+        val applicationId = hostContext.packageName // theoretically should be BuildConfig.APPLICATION_ID of host app
+        val extensionPackageName = this::class.java.`package`?.name
+        Intent("$applicationId.ACTION_EXTENSION_REPLACED").apply {
+            data = "package:$extensionPackageName".toUri()
+            `package` = hostContext.packageName
+            hostContext.sendBroadcast(this)
+        }
     }
 
     override fun setupPreferenceScreen(screen: PreferenceScreen) {
@@ -121,13 +142,47 @@ class ShosetsuSettings :
     ): Preference = newPreference(context) {
         title = ext.name
         summary = """
-            ${ext.lang} • ${ext.version.toVersionString()}
+            ${ext.lang} • ${ext.version.toVersionString()} ${"• INSTALLED".takeIf { PluginManager.isInstalled(ext.toIdentity(repoUrl)) } ?: ""}
         """.trimIndent()
         setOnPreferenceClickListener {
             val identity = ext.toIdentity(repoUrl)
-            launchIO {
-                PluginManager.downloadExtension(identity)
-            }
+
+            val items = arrayOf(
+                "Install/Update",
+                "Uninstall",
+            )
+
+            AlertDialog.Builder(context)
+                .setTitle("Manage Extension")
+                .setIcon(android.R.drawable.ic_dialog_dialer)
+                .setItems(items) { _, which ->
+                    setEnabled(false)
+
+                    launchIO {
+                        val success = when (which) {
+                            0 -> {
+                                val file = PluginManager.downloadExtension(identity)
+                                file != null
+                            }
+                            1 -> {
+                                PluginManager.deleteExtension(identity)
+                            }
+                            else -> false
+                        }
+
+                        runOnMain {
+                            if (success) {
+                                Toast.makeText(context, "Success", Toast.LENGTH_SHORT).show()
+                                reloadExtensions()
+                            } else {
+                                Toast.makeText(context, "Failed", Toast.LENGTH_SHORT).show()
+                            }
+
+                            setEnabled(true)
+                        }
+                    }
+                }
+                .show()
             true
         }
     }
