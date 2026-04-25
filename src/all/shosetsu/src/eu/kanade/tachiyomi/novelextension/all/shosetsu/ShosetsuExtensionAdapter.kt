@@ -48,13 +48,13 @@ class ShosetsuExtensionAdapter(private val ext: LuaExtension, language: String) 
         updateSettings()
     }
 
-    fun updateSettings() {
+    private fun updateSettings() {
         ext.settingsModel.forEach { s ->
             updateSetting(s)
         }
     }
 
-    fun updateSetting(s: ShosetsuFilter<*>) {
+    private fun updateSetting(s: ShosetsuFilter<*>) {
         val id = s.id.toString()
         val value = when (s) {
             is ShosetsuFilter.Text, is ShosetsuFilter.Password -> preferences.getString(id, "")
@@ -72,13 +72,13 @@ class ShosetsuExtensionAdapter(private val ext: LuaExtension, language: String) 
      *
      * @param key The listing type to fetch. Can be either:
      * - `PRIMARY` - always available
-     * - `SECONDARY` -0 may not exist
+     * - `SECONDARY` - may not exist
      *
      * @return index of desired listing or `0`
-     * @throws AssertionError if wrong key is provided
+     * @throws IllegalArgumentException if wrong key is provided
      */
     private fun getListingIndex(key: String = "PRIMARY"): Int {
-        assert(key in listOf("PRIMARY", "SECONDARY"))
+        require(key in setOf("PRIMARY", "SECONDARY")) { "Invalid listing key: $key" }
         val desiredListingIndex = preferences.getString("LISTING_$key", "0")?.toInt() ?: 0
         if (desiredListingIndex > ext.listings.size - 1) return 0
         return desiredListingIndex
@@ -90,7 +90,7 @@ class ShosetsuExtensionAdapter(private val ext: LuaExtension, language: String) 
      * @param index Index of listing to retrieve novels from
      * @param page
      */
-    fun getListing(index: Int = 0, page: Int): NovelsPage {
+    private fun getListing(index: Int = 0, page: Int): NovelsPage {
         val listing = ext.listings[index]
 
         val novels = listing.getListing(
@@ -206,8 +206,8 @@ class ShosetsuExtensionAdapter(private val ext: LuaExtension, language: String) 
     override fun chapterListParse(response: Response): List<SChapter> = throw UnsupportedOperationException("Not used")
 
     override fun fetchNovelDetails(novel: SNovel): Observable<SNovel> {
-        val novel = ext.parseNovel(novel.url, false).toSNovel()
-        return Observable.just(novel)
+        val parsedNovel = ext.parseNovel(novel.url, false).toSNovel()
+        return Observable.just(parsedNovel)
     }
 
     override fun novelDetailsParse(response: Response): SNovel = throw UnsupportedOperationException("Not used")
@@ -287,12 +287,12 @@ class ShosetsuExtensionAdapter(private val ext: LuaExtension, language: String) 
         }
 
         children
-            .map { convertPreference(it, context) }
-            .forEach { child ->
-                if (child is PreferenceCategory) {
-                    attachChildren(child, children.first { it.id.toString() == child.key }, context)
+            .map { child -> child to convertPreference(child, context) }
+            .forEach { (filter, preference) ->
+                if (preference is PreferenceCategory) {
+                    attachChildren(preference, filter, context)
                 }
-                parent.addPreference(child)
+                parent.addPreference(preference)
             }
     }
 
