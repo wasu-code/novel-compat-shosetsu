@@ -3,6 +3,7 @@ package eu.kanade.tachiyomi.novelextension.all.shosetsu
 import android.util.Log
 import app.shosetsu.lib.Version
 import app.shosetsu.lib.json.RepoExtension
+import app.shosetsu.lib.lua.LuaExtension
 import app.shosetsu.lib.lua.LuaLibrary
 import java.io.File
 import java.net.HttpURLConnection
@@ -65,15 +66,66 @@ object PluginManager {
 
     fun downloadExtension(identity: ExtensionIdentity): File? {
         requireInit()
+
+        val destFile = getExtensionFile(identity)
+        val tempFile = File(destFile.absolutePath + ".tmp")
+
         val remoteUrl = URL(
             URL(identity.repoUrl + "/"),
             "src/${identity.lang}/${identity.fileName}.lua",
         )
-        return download(remoteUrl, getExtensionFile(identity))
+
+        // download to temp first
+        val tempResult = download(remoteUrl, tempFile) ?: return null
+
+        // load the extension to get its name and formatterID
+        val incomingExt = try {
+            LuaExtension(tempResult)
+        } catch (e: Exception) {
+            Log.e("PluginManager", "Failed to load downloaded extension for conflict check", e)
+            tempFile.delete()
+            return null
+        }
+
+        // check against all installed extensions for host app ID conflict
+        // TODO keep some index to avoid re-parsing files every time
+        val conflict = getInstalledExtensions()
+            .filter { it.absolutePath != destFile.absolutePath } // ignore self (reinstall/update case)
+            .any { installedFile ->
+                try {
+                    val installedExt = LuaExtension(installedFile)
+                    val installedLang = installedFile.parentFile?.name ?: "all"
+
+                    installedLang == identity.lang &&
+                        installedExt.name == incomingExt.name &&
+                        installedExt.formatterID == incomingExt.formatterID
+                } catch (e: Exception) {
+                    Log.w("PluginManager", "Failed to load installed extension ${installedFile.name} for conflict check", e)
+                    false
+                }
+            }
+
+        if (conflict) {
+            Log.e("PluginManager", "Extension ${identity.fileName} conflicts with an existing extension (same lang+name+formatterID). Download blocked.")
+            tempFile.delete()
+            return null
+        }
+
+        // no conflict — commit
+        if (destFile.exists()) destFile.delete()
+        return if (tempFile.renameTo(destFile)) {
+            destFile.setReadOnly()
+            destFile
+        } else {
+            Log.e("PluginManager", "Failed to rename temp to dest for ${identity.fileName}")
+            tempFile.delete()
+            null
+        }
     }
 
     fun downloadLibrary(repoUrl: String, name: String, version: Version): File? {
         requireInit()
+
         val libFile = getLibraryFile(name)
         if (libFile.exists()) {
             // compare versions
