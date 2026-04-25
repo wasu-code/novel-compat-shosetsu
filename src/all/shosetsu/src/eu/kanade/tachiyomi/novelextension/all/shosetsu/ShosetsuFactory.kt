@@ -25,7 +25,11 @@ class ShosetsuFactory : SourceFactory {
         }
 
         ShosetsuSharedLib.shosetsuHeaders = arrayOf(
-            "User-Agent" to try { WebSettings.getDefaultUserAgent(hostContext) } catch (e: RuntimeException) {""},
+            "User-Agent" to try {
+                WebSettings.getDefaultUserAgent(hostContext)
+            } catch (e: RuntimeException) {
+                ""
+            },
         )
 
         ShosetsuLuaLib.libLoader = libLoader@{ name ->
