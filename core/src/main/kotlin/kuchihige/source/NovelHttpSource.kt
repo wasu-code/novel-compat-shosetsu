@@ -16,6 +16,8 @@ abstract class NovelHttpSource :
     typealias NovelsPage = MangasPage
     typealias SNovel = SManga
 
+    override suspend fun fetchPageText(page: eu.kanade.tachiyomi.source.model.Page): String = throw UnsupportedOperationException("fetchPageText must be overridden")
+
     override fun imageUrlParse(response: Response): String {
         TODO("Not yet implemented")
     }
@@ -64,5 +66,6 @@ abstract class NovelHttpSource :
 
     final override fun fetchSearchManga(page: Int, query: String, filters: FilterList): Observable<NovelsPage> = fetchSearchNovels(page, query, filters)
 
+    @Suppress("PARAMETER_NAME_CHANGED_ON_OVERRIDE")
     override fun fetchChapterList(novel: SNovel): Observable<List<SChapter>> = super.fetchChapterList(novel)
 }
