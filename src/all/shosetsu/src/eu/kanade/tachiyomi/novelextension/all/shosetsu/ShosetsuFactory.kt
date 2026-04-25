@@ -25,11 +25,10 @@ class ShosetsuFactory : SourceFactory {
         }
 
         ShosetsuSharedLib.shosetsuHeaders = arrayOf(
-            "User-Agent" to try {
+            // runCatching to prevents crash in CI
+            "User-Agent" to runCatching {
                 WebSettings.getDefaultUserAgent(hostContext)
-            } catch (e: RuntimeException) {
-                ""
-            },
+            }.getOrDefault(""),
         )
 
         ShosetsuLuaLib.libLoader = libLoader@{ name ->
@@ -60,7 +59,13 @@ class ShosetsuFactory : SourceFactory {
 
         return extensions
             .mapNotNull(::safeCreateSource)
-            .plus(ShosetsuSettings())
+            .plus(
+                // runCatching to prevents crash in CI
+                runCatching {
+                    ShosetsuSettings()
+                }.getOrNull(),
+            )
+            .filterNotNull()
     }
 
     /**
