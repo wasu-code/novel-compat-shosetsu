@@ -1,8 +1,6 @@
 #!/bin/bash
 set -e
 
-cat ../main/repo/index.json
-cat ./index.json
 rsync -avv --checksum --delete --exclude .git --exclude .gitignore --exclude README.md --exclude repo.json ../main/repo/ .
 cat ../main/repo/index.json
 cat ./index.json
