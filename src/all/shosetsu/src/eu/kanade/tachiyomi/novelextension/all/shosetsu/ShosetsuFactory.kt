@@ -9,9 +9,9 @@ import app.shosetsu.lib.ShosetsuSharedLib
 import app.shosetsu.lib.lua.LuaExtension
 import app.shosetsu.lib.lua.ShosetsuLuaLib
 import app.shosetsu.lib.lua.shosetsuGlobals
+import eu.kanade.tachiyomi.network.NetworkHelper
 import eu.kanade.tachiyomi.source.Source
 import eu.kanade.tachiyomi.source.SourceFactory
-import okhttp3.OkHttpClient
 import uy.kohesive.injekt.Injekt
 import uy.kohesive.injekt.api.get
 
@@ -22,7 +22,7 @@ class ShosetsuFactory : SourceFactory {
     private val hostContext by lazy { Injekt.get<Application>() }
 
     init {
-        ShosetsuSharedLib.httpClient = OkHttpClient()
+        ShosetsuSharedLib.httpClient = Injekt.get<NetworkHelper>().client
 
         ShosetsuSharedLib.logger = { extensionName, log ->
             Log.d("Shosetsu (ext)", "[$extensionName] $log")
