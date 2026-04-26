@@ -136,7 +136,7 @@ class ShosetsuSettings :
                                 },
                             )
                         } else {
-                            extensions.forEach { ext ->
+                            extensions.sortedByDescending { it.isInstalled }.forEach { ext ->
                                 category.addPreference(createExtensionPreference(context, ext))
                             }
                         }
