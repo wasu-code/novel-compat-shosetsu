@@ -133,7 +133,7 @@ class ShosetsuExtensionAdapter(private val ext: LuaExtension, language: String) 
 
     override fun fetchSearchNovels(page: Int, query: String, filters: FilterList): Observable<NovelsPage> {
         // If query is not provided that is probably filtering, not search, and should still be handled
-        // Should filtering use .search or .getListing?
+        // TODO: Should filtering use .search or .getListing?
         if (!ext.hasSearch && query.isNotEmpty()) throw UnsupportedOperationException("Search not supported in this extensions")
 
         val filterMap = mutableMapOf<Int, Any>(
@@ -323,27 +323,32 @@ class ShosetsuExtensionAdapter(private val ext: LuaExtension, language: String) 
             }.also(screen::addPreference)
         }
 
-        // ============== Add preferences provided by lua extension ==============
-        val extensionSettingsCat = PreferenceCategory(screen.context)
-            .apply {
-                title = "Extension settings"
+//      === Preferences provided by lua extension =============================
+
+        if (ext.settingsModel.isNotEmpty()) {
+            val extensionSettingsCat = PreferenceCategory(screen.context)
+                .apply {
+                    title = "Extension settings"
+                }
+                .also(screen::addPreference)
+
+            ext.settingsModel.forEach { s ->
+                val preference: Preference = convertPreference(s, screen.context)
+
+                if (preference is PreferenceCategory) {
+                    attachChildren(preference, s, screen.context)
+                }
+
+                preference.setOnPreferenceChangeListener { _, _ ->
+                    handler.post { updateSettings() }
+                    true
+                }
+
+                extensionSettingsCat.addPreference(preference)
             }
-            .also(screen::addPreference)
-
-        ext.settingsModel.forEach { s ->
-            val preference: Preference = convertPreference(s, screen.context)
-
-            if (preference is PreferenceCategory) {
-                attachChildren(preference, s, screen.context)
-            }
-
-            preference.setOnPreferenceChangeListener { _, _ ->
-                handler.post { updateSettings() }
-                true
-            }
-
-            extensionSettingsCat.addPreference(preference)
         }
+
+//      === Info about extension ==============================================
 
         Preference::class.java
             .getConstructor(Context::class.java)
@@ -357,7 +362,7 @@ class ShosetsuExtensionAdapter(private val ext: LuaExtension, language: String) 
                         version: ${meta.version} (library version ${meta.libVersion})
                         created by: ${meta.author}
                         depends on: ${meta.dependencies.entries.joinToString { it.key + " v" + it.value }}
-                        source: ${meta.repo}
+                        from repo: ${meta.repo}
                     """.trimIndent()
                 } catch (_: InvalidMetaDataException) {
                     "Can't load metadata for this extension"
