@@ -10,6 +10,7 @@ import android.util.Log
 import android.widget.Toast
 import androidx.core.net.toUri
 import androidx.preference.EditTextPreference
+import androidx.preference.MultiSelectListPreference
 import androidx.preference.Preference
 import androidx.preference.PreferenceCategory
 import androidx.preference.PreferenceScreen
@@ -70,23 +71,35 @@ class ShosetsuSettings :
         val reposPref = EditTextPreference(screen.context).apply {
             key = "REPOS"
             title = "Repositories"
+            summary = "Add URLs of repositories providing Shosetsu extensions"
             dialogTitle = "Repositories URLs"
             dialogMessage = "One per line"
+        }.also(screen::addPreference)
+
+        val enabledRepos = MultiSelectListPreference(screen.context).apply {
+            key = "ENABLED_REPOS"
+            title = "Select repositories"
+            summary = "Enable/disable repositories to display extensions (and load libraries) from"
+            val repos = reposPref.text.split("\n").toSet()
+            entries = repos.map { tryParseRepoName(it) }.toTypedArray()
+            entryValues = repos.toTypedArray()
+            values = values.intersect(repos)
+            setDefaultValue(repos)
 
             setOnPreferenceChangeListener { _, newValue ->
-                updateRepoList(screen, newValue as String)
+                @Suppress("unchecked_cast")
+                updateRepoList(screen, newValue as Set<String>)
                 true
             }
         }.also(screen::addPreference)
 
-        updateRepoList(screen, reposPref.text ?: "")
+        updateRepoList(screen, enabledRepos.values ?: emptySet())
     }
 
-    private fun updateRepoList(screen: PreferenceScreen, raw: String) {
+    private fun updateRepoList(screen: PreferenceScreen, repoSet: Set<String>) {
         val context = screen.context
 
-        val repos = raw.lines()
-            .map { it.trim() }
+        val repos = repoSet.map { it.trim() }
             .filter { it.isNotEmpty() }
 
         val toRemove = (0 until getPreferenceCount(screen))
