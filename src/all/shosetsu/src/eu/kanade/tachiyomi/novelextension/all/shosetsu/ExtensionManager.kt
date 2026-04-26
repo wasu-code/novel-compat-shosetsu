@@ -14,8 +14,18 @@ class ShosetsuExtension(
     repoUrl: String,
 ) {
     val identity = metadata.toIdentity(repoUrl)
-    val isInstalled = ExtensionManager.isInstalled(identity)
-    val state = if (isInstalled) ExtensionState.Installed else ExtensionState.Available
+    private val extensionFile = ExtensionManager.getExtensionFile(identity)
+    val isInstalled = extensionFile.exists()
+    val localMetadata = if (isInstalled) {
+        withExtensionClassLoader(javaClass.classLoader!!) { LuaExtension(extensionFile) }.exMetaData
+    } else {
+        null
+    }
+    val state = when {
+        localMetadata!=null && metadata.version > localMetadata.version -> ExtensionState.UpdatePending
+        isInstalled -> ExtensionState.Installed
+        else -> ExtensionState.Available
+    }
 }
 
 sealed class ExtensionState {
@@ -55,6 +65,10 @@ fun RepoExtension.toIdentity(repoUrl: String) = ExtensionIdentity(
     fileName = fileName,
 )
 
+object ExtensionCache {
+
+}
+
 object ExtensionManager {
     private lateinit var srcDir: File
     private lateinit var libDir: File
@@ -70,7 +84,7 @@ object ExtensionManager {
         }
     }
 
-    // === Paths ================================================================
+//  === Paths =================================================================
 
     fun getExtensionFile(identity: ExtensionIdentity): File {
         requireInit()
@@ -86,7 +100,7 @@ object ExtensionManager {
 
     fun isLibraryInstalled(name: String): Boolean = getLibraryFile(name).exists()
 
-    // === Download ============================================================
+//  === Download ==============================================================
 
     fun downloadExtension(identity: ExtensionIdentity): File? {
         requireInit()
@@ -137,7 +151,7 @@ object ExtensionManager {
             return null
         }
 
-        // no conflict — commit
+        // no conflict → commit
         if (destFile.exists()) destFile.delete()
         return if (tempFile.renameTo(destFile)) {
             destFile.setReadOnly()
@@ -195,7 +209,7 @@ object ExtensionManager {
         }
     }
 
-    // === Delete ===============================================================
+//  === Delete ================================================================
 
     fun deleteExtension(identity: ExtensionIdentity): Boolean = getExtensionFile(identity).let { it.exists() && it.delete() }
 
@@ -216,7 +230,7 @@ object ExtensionManager {
         return deleteAllExtensions() && deleteAllLibraries()
     }
 
-    // === Installed =============================================================
+//  === Installed =============================================================
 
     fun getInstalledExtensions(): List<File> {
         requireInit()
