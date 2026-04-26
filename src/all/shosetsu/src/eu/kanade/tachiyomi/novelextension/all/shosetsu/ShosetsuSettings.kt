@@ -22,6 +22,7 @@ import eu.kanade.tachiyomi.source.model.SManga
 import rx.Observable
 import uy.kohesive.injekt.Injekt
 import uy.kohesive.injekt.api.get
+import java.util.Locale
 
 class ShosetsuSettings :
     Source,
@@ -29,8 +30,12 @@ class ShosetsuSettings :
     ConfigurableSource {
     override val id: Long = 1774169168
     val lang: String = "all"
+
+    // `!` character to pin it to the top of the list
     override val name: String = "! 书 Shosetsu Settings"
-    override fun toString(): String = name
+
+    // display name
+    override fun toString(): String = "Settings"
 
     private val mainHandler = Handler(Looper.getMainLooper())
     private val hostContext by lazy { Injekt.get<Application>() }
@@ -58,6 +63,9 @@ class ShosetsuSettings :
     }
 
     override fun setupPreferenceScreen(screen: PreferenceScreen) {
+        // remove prefs added by host app, we don't need them for this dummy source
+        removeAllPreferences(screen)
+
         Preference::class.java
             .getConstructor(Context::class.java)
             .newInstance(screen.context)
@@ -85,18 +93,48 @@ class ShosetsuSettings :
             entryValues = repos.toTypedArray()
             values = values.intersect(repos)
             setDefaultValue(repos)
-
-            setOnPreferenceChangeListener { _, newValue ->
-                @Suppress("unchecked_cast")
-                updateRepoList(screen, newValue as Set<String>)
-                true
-            }
         }.also(screen::addPreference)
 
-        updateRepoList(screen, enabledRepos.values)
+        val filterCategory = PreferenceCategory(screen.context).apply {
+            summary = "Limit the amount of extensions on the list"
+        }.also(screen::addPreference)
+
+        val languageFilter = MultiSelectListPreference(screen.context).apply {
+            key = "LANG_FILTER"
+            title = "Filter by language"
+            summary = "Initialized with your local language and multilingual extensions"
+
+            val languages = setOf("all" to "Multilingual") +
+                Locale.getISOLanguages()
+                    .map { code ->
+                        val locale = Locale(code)
+                        code to locale.getDisplayLanguage(locale)
+                    }
+                    .sortedBy { it.second }
+            entries = languages.map { it.second }.toTypedArray()
+            entryValues = languages.map { it.first }.toTypedArray()
+
+            val userLang = Locale.getDefault().language
+            setDefaultValue(setOf("all", userLang))
+        }.also(filterCategory::addPreference)
+
+        enabledRepos.setOnPreferenceChangeListener { _, newValue ->
+            @Suppress("unchecked_cast")
+            updateRepoList(screen, newValue as Set<String>, languageFilter.values)
+            true
+        }
+
+        languageFilter.setOnPreferenceChangeListener { _, newValue ->
+            @Suppress("unchecked_cast")
+            updateRepoList(screen, enabledRepos.values, newValue as Set<String>)
+            true
+        }
+
+        // initial load of extensions lists
+        updateRepoList(screen, enabledRepos.values, languageFilter.values)
     }
 
-    private fun updateRepoList(screen: PreferenceScreen, repoSet: Set<String> = emptySet()) {
+    private fun updateRepoList(screen: PreferenceScreen, repoSet: Set<String> = emptySet(), languageSet: Set<String> = emptySet()) {
         val context = screen.context
 
         val repos = repoSet.map { it.trim() }
@@ -126,19 +164,22 @@ class ShosetsuSettings :
                 try {
                     val repo = RepositoryManager.getRepo(repoUrl)
                     val extensions = repo.extensions.map { ShosetsuExtension(it, repoUrl) }
+                    val filteredExtensions = extensions.filter {
+                        it.metadata.lang in languageSet
+                    }
                     val libraries = repo.libraries
 
                     runOnMain {
                         category.removeAll()
-                        if (extensions.isEmpty()) {
+                        if (filteredExtensions.isEmpty()) {
                             category.addPreference(
                                 newPreference(context) {
-                                    title = "No extensions found"
+                                    title = if (extensions.isEmpty()) "No extensions found" else "No extension match selected filters"
                                     setEnabled(false)
                                 },
                             )
                         } else {
-                            extensions.sortedWith(
+                            filteredExtensions.sortedWith(
                                 compareByDescending<ShosetsuExtension> { it.isInstalled }
                                     .thenBy { it.metadata.name },
                             ).forEach { ext ->
@@ -315,6 +356,14 @@ class ShosetsuSettings :
                 .invoke(screen, pref)
         } catch (_: Exception) {
         }
+    }
+
+    private fun removeAllPreferences(screen: PreferenceScreen) {
+        try {
+            PreferenceScreen::class.java
+                .getMethod("removeAll")
+                .invoke(screen)
+        } catch (_: Exception) {}
     }
 
 //  === Unused ================================================================
