@@ -1,6 +1,7 @@
 package eu.kanade.tachiyomi.novelextension.all.shosetsu
 
 import androidx.preference.Preference
+import app.shosetsu.lib.Version
 
 fun Preference.setIconReflect(resId: Int): Preference {
     try {
@@ -28,3 +29,5 @@ fun Preference.setIconReflect(resId: Int): Preference {
     }
     return this
 }
+
+fun Version.toVersionString(): String = "$major.$minor.$patch"

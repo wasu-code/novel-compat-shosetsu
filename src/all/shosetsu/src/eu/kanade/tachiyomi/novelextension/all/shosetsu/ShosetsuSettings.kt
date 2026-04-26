@@ -13,7 +13,6 @@ import androidx.preference.EditTextPreference
 import androidx.preference.Preference
 import androidx.preference.PreferenceCategory
 import androidx.preference.PreferenceScreen
-import app.shosetsu.lib.Version
 import app.shosetsu.lib.json.RepoExtension
 import eu.kanade.tachiyomi.source.ConfigurableSource
 import eu.kanade.tachiyomi.source.Source
@@ -23,8 +22,6 @@ import eu.kanade.tachiyomi.source.model.SManga
 import rx.Observable
 import uy.kohesive.injekt.Injekt
 import uy.kohesive.injekt.api.get
-
-fun Version.toVersionString(): String = "$major.$minor.$patch"
 
 class ShosetsuSettings :
     Source,
@@ -46,7 +43,8 @@ class ShosetsuSettings :
     }
 
     /**
-     * Reload extensions from disk so that newly installed Shosetsu extensions appear in the host app.
+     * Prompt host app to reload all extensions.
+     * That will make newly installed Shosetsu extensions appear in the host app without app restart.
      */
     fun reloadExtensions() {
         val applicationId = hostContext.packageName // theoretically should be BuildConfig.APPLICATION_ID of host app
@@ -89,9 +87,11 @@ class ShosetsuSettings :
         repos.forEachIndexed { index, repoUrl ->
             val category = PreferenceCategory(context).apply {
                 key = "repo_$index"
-                title = repoUrl
-            }
-            screen.addPreference(category)
+                title = tryParseRepoName(repoUrl)
+                summary = repoUrl
+                initialExpandedChildrenCount = 3
+            }.also(screen::addPreference)
+
             category.addPreference(
                 newPreference(context) {
                     title = "Loading…"
@@ -193,6 +193,35 @@ class ShosetsuSettings :
         }
     }
 
+//  === Etc. ==================================================================
+
+    fun tryParseRepoName(repoUrl: String): String = try {
+        val cleaned = repoUrl
+            .removePrefix("https://")
+            .removePrefix("http://")
+            .removePrefix("www.")
+            .trim('/')
+
+        val path = cleaned.substringAfter('/', "")
+        val parts = path.split("/").filter { it.isNotBlank() }
+
+        when {
+            // <domain>/<owner>/<repo> (GitHub, Gitlab)
+            (
+                cleaned.startsWith("raw.githubusercontent.com") ||
+                    cleaned.startsWith("gitlab.com")
+                ) &&
+                parts.size >= 2
+            -> "${parts[1].replaceFirstChar { it.uppercase() }} by ${parts[0]}"
+
+            else -> repoUrl
+        }
+    } catch (_: Exception) {
+        repoUrl
+    }
+
+//  === Preference Helpers ====================================================
+
     private fun newPreference(context: Context, block: Preference.() -> Unit): Preference = Preference::class.java
         .getConstructor(Context::class.java)
         .newInstance(context)
@@ -222,6 +251,8 @@ class ShosetsuSettings :
         } catch (_: Exception) {
         }
     }
+
+//  === Unused ================================================================
 
     override fun fetchChapterList(manga: SManga): Observable<List<SChapter>> = throw UnsupportedOperationException("Not used")
     override fun fetchMangaDetails(manga: SManga): Observable<SManga> = throw UnsupportedOperationException("Not used")
