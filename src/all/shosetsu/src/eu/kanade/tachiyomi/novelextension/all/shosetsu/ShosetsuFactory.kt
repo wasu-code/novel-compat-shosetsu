@@ -48,7 +48,7 @@ class ShosetsuFactory : SourceFactory {
     override fun createSources(): List<Source> {
         ExtensionManager.init(hostContext.filesDir)
 
-        val extensions = withExtensionClassLoader {
+        val extensions = withExtensionClassLoader(javaClass.classLoader!!) {
             ExtensionManager.getInstalledExtensions()
                 .map { file ->
                     val lang = file.parentFile?.name ?: "all"
@@ -66,32 +66,6 @@ class ShosetsuFactory : SourceFactory {
                 }.getOrNull(),
             )
             .filterNotNull()
-    }
-
-    /**
-     * Executes the given [block] using the extension's class loader as the current thread context
-     * class loader.
-     *
-     * This is required due to some necessary resources being packaged with the extension rather
-     * than the host application. By default, the host app's class loader would be used, which can
-     * prevent the extension from accessing its own resources.
-     *
-     * Restores the original class loader after execution.
-     *
-     * @param T the return type of the [block]
-     * @param block the code to execute with the extension class loader
-     * @return the result of [block]
-     */
-    inline fun <T> withExtensionClassLoader(block: () -> T): T {
-        val thread = Thread.currentThread()
-        val original = thread.contextClassLoader
-
-        return try {
-            thread.contextClassLoader = javaClass.classLoader
-            block()
-        } finally {
-            thread.contextClassLoader = original
-        }
     }
 
     private fun safeCreateSource(pair: Pair<LuaExtension, String>): Source? {

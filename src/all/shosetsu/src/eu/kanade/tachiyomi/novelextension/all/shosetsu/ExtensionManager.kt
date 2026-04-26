@@ -104,7 +104,9 @@ object ExtensionManager {
 
         // load the extension to get its name and formatterID
         val incomingExt = try {
-            LuaExtension(tempResult)
+            withExtensionClassLoader(javaClass.classLoader!!) {
+                LuaExtension(tempResult)
+            }
         } catch (e: Exception) {
             Log.e("ExtensionManager", "Failed to load downloaded extension for conflict check", e)
             tempFile.delete()
