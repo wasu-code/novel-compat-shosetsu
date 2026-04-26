@@ -34,7 +34,7 @@ class ShosetsuFactory : SourceFactory {
         ShosetsuLuaLib.libLoader = libLoader@{ name ->
             Log.i("LuaLibLoader", "Loading ($name)")
             try {
-                val result = PluginManager.getLibraryFile(name)
+                val result = ExtensionManager.getLibraryFile(name)
                 val l =
                     shosetsuGlobals().load(result.readText(), "lib($name)")
                 l.call()
@@ -46,10 +46,10 @@ class ShosetsuFactory : SourceFactory {
     }
 
     override fun createSources(): List<Source> {
-        PluginManager.init(hostContext.filesDir)
+        ExtensionManager.init(hostContext.filesDir)
 
         val extensions = withExtensionClassLoader {
-            PluginManager.getInstalledExtensions()
+            ExtensionManager.getInstalledExtensions()
                 .map { file ->
                     val lang = file.parentFile?.name ?: "all"
                     LuaExtension(file) to lang

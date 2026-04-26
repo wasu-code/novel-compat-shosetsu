@@ -6,6 +6,15 @@ import keiyoushi.utils.parseAs
 import kotlinx.serialization.json.Json
 import java.net.URL
 
+object RepoCache {
+    private val REPOS = mutableMapOf<String, RepoIndex>()
+
+    fun get(repoUrl: String): RepoIndex? = REPOS[repoUrl]
+    fun put(repoUrl: String, index: RepoIndex) {
+        REPOS[repoUrl] = index
+    }
+}
+
 object RepositoryManager {
     private val json = Json {
         ignoreUnknownKeys = true
@@ -13,8 +22,11 @@ object RepositoryManager {
     }
 
     fun getRepo(url: String): RepoIndex {
-        Log.d("Shosetsu", "Parsing remote repository: $url")
+        Log.d("Shosetsu", "Getting repository: $url")
+        RepoCache.get(url)?.let { return it }
+        Log.d("Shosetsu", "Fetching remote repository: $url")
         val response = URL(URL(url), "index.json").readText()
-        return response.parseAs<RepoIndex>(json)
+        val repo = response.parseAs<RepoIndex>(json)
+        return repo.also { RepoCache.put(url, it) }
     }
 }

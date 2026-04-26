@@ -31,7 +31,7 @@ fun RepoExtension.toIdentity(repoUrl: String) = ExtensionIdentity(
     fileName = fileName,
 )
 
-object PluginManager {
+object ExtensionManager {
     private lateinit var srcDir: File
     private lateinit var libDir: File
 
@@ -42,7 +42,7 @@ object PluginManager {
 
     private fun requireInit() {
         check(::srcDir.isInitialized) {
-            "PluginManager.init(filesDir) must be called before using PluginManager"
+            "ExtensionManager.init(filesDir) must be called before using ExtensionManager"
         }
     }
 
@@ -82,7 +82,7 @@ object PluginManager {
         val incomingExt = try {
             LuaExtension(tempResult)
         } catch (e: Exception) {
-            Log.e("PluginManager", "Failed to load downloaded extension for conflict check", e)
+            Log.e("ExtensionManager", "Failed to load downloaded extension for conflict check", e)
             tempFile.delete()
             return null
         }
@@ -100,13 +100,13 @@ object PluginManager {
                         installedExt.name == incomingExt.name &&
                         installedExt.formatterID == incomingExt.formatterID
                 } catch (e: Exception) {
-                    Log.w("PluginManager", "Failed to load installed extension ${installedFile.name} for conflict check", e)
+                    Log.w("ExtensionManager", "Failed to load installed extension ${installedFile.name} for conflict check", e)
                     false
                 }
             }
 
         if (conflict) {
-            Log.e("PluginManager", "Extension ${identity.fileName} conflicts with an existing extension (same lang+name+formatterID). Download blocked.")
+            Log.e("ExtensionManager", "Extension ${identity.fileName} conflicts with an existing extension (same lang+name+formatterID). Download blocked.")
             tempFile.delete()
             return null
         }
@@ -117,7 +117,7 @@ object PluginManager {
             destFile.setReadOnly()
             destFile
         } else {
-            Log.e("PluginManager", "Failed to rename temp to dest for ${identity.fileName}")
+            Log.e("ExtensionManager", "Failed to rename temp to dest for ${identity.fileName}")
             tempFile.delete()
             null
         }
@@ -138,6 +138,7 @@ object PluginManager {
     }
 
     private fun download(remoteUrl: URL, destFile: File): File? {
+        Log.d("Shosetsu", "Downloading remote file: $remoteUrl")
         val tempFile = File(destFile.absolutePath + ".tmp")
         return try {
             destFile.parentFile?.mkdirs()
@@ -162,7 +163,7 @@ object PluginManager {
             destFile.setReadOnly()
             destFile
         } catch (e: Exception) {
-            Log.e("PluginManager", "Download failed: $remoteUrl", e)
+            Log.e("ExtensionManager", "Download failed: $remoteUrl", e)
             tempFile.delete()
             null
         }

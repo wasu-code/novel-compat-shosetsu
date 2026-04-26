@@ -145,7 +145,7 @@ class ShosetsuSettings :
                     }
 
                     libraries.forEach { lib ->
-                        PluginManager.downloadLibrary(repoUrl, lib.name, lib.version)
+                        ExtensionManager.downloadLibrary(repoUrl, lib.name, lib.version)
                     }
                 } catch (e: Exception) {
                     Log.e("ShosetsuSettings", "Failed to load $repoUrl", e)
@@ -171,7 +171,7 @@ class ShosetsuSettings :
     ): Preference = newPreference(context) {
         title = ext.name
         summary = """
-            ${ext.lang} • ${ext.version.toVersionString()} ${"• INSTALLED".takeIf { PluginManager.isInstalled(ext.toIdentity(repoUrl)) } ?: ""}
+            ${ext.lang} • ${ext.version.toVersionString()} ${"• INSTALLED".takeIf { ExtensionManager.isInstalled(ext.toIdentity(repoUrl)) } ?: ""}
         """.trimIndent()
         setOnPreferenceClickListener {
             val identity = ext.toIdentity(repoUrl)
@@ -190,11 +190,11 @@ class ShosetsuSettings :
                     launchIO {
                         val success = when (which) {
                             0 -> {
-                                val file = PluginManager.downloadExtension(identity)
+                                val file = ExtensionManager.downloadExtension(identity)
                                 file != null
                             }
                             1 -> {
-                                PluginManager.deleteExtension(identity)
+                                ExtensionManager.deleteExtension(identity)
                             }
                             else -> false
                         }
