@@ -93,10 +93,10 @@ class ShosetsuSettings :
             }
         }.also(screen::addPreference)
 
-        updateRepoList(screen, enabledRepos.values ?: emptySet())
+        updateRepoList(screen, enabledRepos.values)
     }
 
-    private fun updateRepoList(screen: PreferenceScreen, repoSet: Set<String>) {
+    private fun updateRepoList(screen: PreferenceScreen, repoSet: Set<String> = emptySet()) {
         val context = screen.context
 
         val repos = repoSet.map { it.trim() }
@@ -138,7 +138,10 @@ class ShosetsuSettings :
                                 },
                             )
                         } else {
-                            extensions.sortedByDescending { it.isInstalled }.forEach { ext ->
+                            extensions.sortedWith(
+                                compareByDescending<ShosetsuExtension> { it.isInstalled }
+                                    .thenBy { it.metadata.name },
+                            ).forEach { ext ->
                                 category.addPreference(createExtensionPreference(context, ext))
                             }
                         }
