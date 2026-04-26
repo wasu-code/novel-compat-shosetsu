@@ -14,6 +14,7 @@ import androidx.preference.Preference
 import androidx.preference.PreferenceCategory
 import androidx.preference.PreferenceScreen
 import eu.kanade.tachiyomi.source.ConfigurableSource
+import eu.kanade.tachiyomi.source.NovelSource
 import eu.kanade.tachiyomi.source.Source
 import eu.kanade.tachiyomi.source.model.Page
 import eu.kanade.tachiyomi.source.model.SChapter
@@ -24,6 +25,7 @@ import uy.kohesive.injekt.api.get
 
 class ShosetsuSettings :
     Source,
+    NovelSource,
     ConfigurableSource {
     override val id: Long = 1774169168
     val lang: String = "all"
@@ -317,4 +319,5 @@ class ShosetsuSettings :
     override fun fetchChapterList(manga: SManga): Observable<List<SChapter>> = throw UnsupportedOperationException("Not used")
     override fun fetchMangaDetails(manga: SManga): Observable<SManga> = throw UnsupportedOperationException("Not used")
     override fun fetchPageList(chapter: SChapter): Observable<List<Page>> = throw UnsupportedOperationException("Not used")
+    override suspend fun fetchPageText(page: Page): String = throw UnsupportedOperationException("Not used")
 }
