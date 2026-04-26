@@ -110,7 +110,7 @@ class ShosetsuSettings :
                         val locale = Locale(code)
                         code to locale.getDisplayLanguage(locale)
                     }
-                    .sortedBy { it.second }
+                    .sortedBy { it.second.lowercase(Locale.getDefault()) }
             entries = languages.map { it.second }.toTypedArray()
             entryValues = languages.map { it.first }.toTypedArray()
 
