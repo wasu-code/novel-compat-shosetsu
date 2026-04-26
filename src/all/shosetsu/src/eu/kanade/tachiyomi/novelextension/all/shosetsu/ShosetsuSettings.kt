@@ -57,6 +57,16 @@ class ShosetsuSettings :
     }
 
     override fun setupPreferenceScreen(screen: PreferenceScreen) {
+        Preference::class.java
+            .getConstructor(Context::class.java)
+            .newInstance(screen.context)
+            .apply {
+                // TODO: update this summary when host adds support for keeping js/css in Advanced tab
+                summary = "Extensions that rely on injecting scripts/styles into HTML may not work correctly"
+                setIconReflect(android.R.drawable.ic_menu_info_details)
+            }
+            .also(screen::addPreference)
+
         val reposPref = EditTextPreference(screen.context).apply {
             key = "REPOS"
             title = "Repositories"
