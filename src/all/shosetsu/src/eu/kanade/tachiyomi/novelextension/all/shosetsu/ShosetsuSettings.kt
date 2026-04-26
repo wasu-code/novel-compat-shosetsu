@@ -7,14 +7,12 @@ import android.content.Intent
 import android.os.Handler
 import android.os.Looper
 import android.util.Log
-import android.widget.Toast
 import androidx.core.net.toUri
 import androidx.preference.EditTextPreference
 import androidx.preference.MultiSelectListPreference
 import androidx.preference.Preference
 import androidx.preference.PreferenceCategory
 import androidx.preference.PreferenceScreen
-import app.shosetsu.lib.json.RepoExtension
 import eu.kanade.tachiyomi.source.ConfigurableSource
 import eu.kanade.tachiyomi.source.Source
 import eu.kanade.tachiyomi.source.model.Page
@@ -125,7 +123,7 @@ class ShosetsuSettings :
             launchIO {
                 try {
                     val repo = RepositoryManager.getRepo(repoUrl)
-                    val extensions = repo.extensions
+                    val extensions = repo.extensions.map { ShosetsuExtension(it, repoUrl) }
                     val libraries = repo.libraries
 
                     runOnMain {
@@ -139,7 +137,7 @@ class ShosetsuSettings :
                             )
                         } else {
                             extensions.forEach { ext ->
-                                category.addPreference(createExtensionPreference(context, repoUrl, ext))
+                                category.addPreference(createExtensionPreference(context, ext))
                             }
                         }
                     }
@@ -166,15 +164,16 @@ class ShosetsuSettings :
 
     private fun createExtensionPreference(
         context: Context,
-        repoUrl: String,
-        ext: RepoExtension,
+        ext: ShosetsuExtension,
     ): Preference = newPreference(context) {
-        title = ext.name
+        title = ext.metadata.name
         summary = """
-            ${ext.lang} • ${ext.version.toVersionString()} ${"• INSTALLED".takeIf { ExtensionManager.isInstalled(ext.toIdentity(repoUrl)) } ?: ""}
+            ${ext.metadata.lang} • ${ext.metadata.version.toVersionString()}
         """.trimIndent()
+        updateExtensionIcon(ext.state)
+
         setOnPreferenceClickListener {
-            val identity = ext.toIdentity(repoUrl)
+            val identity = ext.identity
 
             val items = arrayOf(
                 "Install/Update",
@@ -186,29 +185,11 @@ class ShosetsuSettings :
                 .setIcon(android.R.drawable.ic_dialog_dialer)
                 .setItems(items) { _, which ->
                     setEnabled(false)
+                    updateExtensionIcon(ExtensionState.Processing)
 
-                    launchIO {
-                        val success = when (which) {
-                            0 -> {
-                                val file = ExtensionManager.downloadExtension(identity)
-                                file != null
-                            }
-                            1 -> {
-                                ExtensionManager.deleteExtension(identity)
-                            }
-                            else -> false
-                        }
-
-                        runOnMain {
-                            if (success) {
-                                Toast.makeText(context, "Success", Toast.LENGTH_SHORT).show()
-                                reloadExtensions()
-                            } else {
-                                Toast.makeText(context, "Failed", Toast.LENGTH_SHORT).show()
-                            }
-
-                            setEnabled(true)
-                        }
+                    when (which) {
+                        0 -> installExtension(identity)
+                        1 -> uninstallExtension(identity)
                     }
                 }
                 .show()
@@ -241,6 +222,62 @@ class ShosetsuSettings :
         }
     } catch (_: Exception) {
         repoUrl
+    }
+
+    fun Preference.updateExtensionIcon(state: ExtensionState) {
+        this.setIconReflect(
+            when (state) {
+                is ExtensionState.Processing -> android.R.drawable.stat_notify_sync
+                is ExtensionState.Available -> android.R.drawable.presence_invisible
+                is ExtensionState.Installed -> android.R.drawable.presence_online
+                is ExtensionState.UpdatePending -> android.R.drawable.presence_away
+                is ExtensionState.Orphaned -> android.R.drawable.presence_busy
+                is ExtensionState.OperationFailed -> android.R.drawable.ic_popup_disk_full
+                is ExtensionState.Removed -> android.R.drawable.presence_offline
+            },
+        )
+    }
+
+    fun Preference.installExtension(identity: ExtensionIdentity) = performExtensionAction(
+        action = { ExtensionManager.downloadExtension(identity) != null },
+        successState = ExtensionState.Installed,
+    )
+
+    fun Preference.uninstallExtension(identity: ExtensionIdentity) = performExtensionAction(
+        action = { ExtensionManager.deleteExtension(identity) },
+        successState = ExtensionState.Removed,
+    )
+
+    /**
+     * Executes an extension-related action and updates the UI state accordingly.
+     *
+     * @param action A function performing the extension operation.
+     *               Should return `true` on success, `false` otherwise.
+     * @param successState The [ExtensionState] to apply when the action succeeds.
+     *
+     * On failure, [ExtensionState.OperationFailed] is applied automatically.
+     */
+    private fun Preference.performExtensionAction(
+        action: () -> Boolean,
+        successState: ExtensionState,
+    ) {
+        launchIO {
+            val success = try {
+                action()
+            } catch (_: Exception) {
+                false
+            }
+
+            runOnMain {
+                if (success) {
+                    updateExtensionIcon(successState)
+                    reloadExtensions()
+                } else {
+                    updateExtensionIcon(ExtensionState.OperationFailed)
+                }
+                setEnabled(true)
+            }
+        }
     }
 
 //  === Preference Helpers ====================================================

@@ -9,13 +9,37 @@ import java.io.File
 import java.net.HttpURLConnection
 import java.net.URL
 
-data class ShosetsuExtension(
-    val extension: RepoExtension,
-    val installed: Boolean,
-    /** Set to `true` when the installed plugin is not available anymore in remote repo */
-    val orphaned: Boolean? = null,
-    val updateAvailable: Boolean? = null,
-)
+class ShosetsuExtension(
+    val metadata: RepoExtension,
+    repoUrl: String,
+) {
+    val identity = metadata.toIdentity(repoUrl)
+    val isInstalled = ExtensionManager.isInstalled(identity)
+    val state = if (isInstalled) ExtensionState.Installed else ExtensionState.Available
+}
+
+sealed class ExtensionState {
+    /** Extension is available to download */
+    data object Available : ExtensionState()
+
+    /** In process of (un)installing the extension */
+    data object Processing : ExtensionState()
+
+    /** Extension is installed */
+    data object Installed : ExtensionState()
+
+    /** Extension is installed and remote repo offers a higher version */
+    data object UpdatePending : ExtensionState()
+
+    /** Extension is installed but do not appear in a repository associated with it */
+    data object Orphaned : ExtensionState()
+
+    /** Operation taken on the extension failed */
+    data object OperationFailed : ExtensionState()
+
+    /** Extension was just removed */
+    data object Removed : ExtensionState()
+}
 
 data class ExtensionIdentity(
     val repoUrl: String,
