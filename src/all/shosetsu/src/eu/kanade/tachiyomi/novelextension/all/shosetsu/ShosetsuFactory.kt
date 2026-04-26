@@ -49,10 +49,10 @@ class ShosetsuFactory : SourceFactory {
         ExtensionManager.init(hostContext.filesDir)
 
         val extensions = withExtensionClassLoader(javaClass.classLoader!!) {
-            ExtensionManager.getInstalledExtensions()
+            ExtensionManager.getInstalledExtensionsFiles()
                 .map { file ->
-                    val lang = file.parentFile?.name ?: "all"
-                    LuaExtension(file) to lang
+                    val ext = ShosetsuExtension.fromFile(file)
+                    ext.loadLuaExtension() to ext.lang
                 }
 //                .plus(LuaExtension(luaExtTextContent, "DebugExt") to "all")
         }

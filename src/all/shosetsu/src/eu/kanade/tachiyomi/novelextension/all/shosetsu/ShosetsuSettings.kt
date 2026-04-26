@@ -163,9 +163,9 @@ class ShosetsuSettings :
             launchIO {
                 try {
                     val repo = RepositoryManager.getRepo(repoUrl)
-                    val extensions = repo.extensions.map { ShosetsuExtension(it, repoUrl) }
+                    val extensions = repo.extensions.map { ShosetsuExtension.fromRemote(it, repoUrl) }
                     val filteredExtensions = extensions.filter {
-                        it.metadata.lang in languageSet
+                        it.lang in languageSet
                     }
                     val libraries = repo.libraries
 
@@ -181,7 +181,7 @@ class ShosetsuSettings :
                         } else {
                             filteredExtensions.sortedWith(
                                 compareByDescending<ShosetsuExtension> { it.isInstalled }
-                                    .thenBy { it.metadata.name },
+                                    .thenBy { it.name },
                             ).forEach { ext ->
                                 category.addPreference(createExtensionPreference(context, ext))
                             }
@@ -212,15 +212,13 @@ class ShosetsuSettings :
         context: Context,
         ext: ShosetsuExtension,
     ): Preference = newPreference(context) {
-        title = ext.metadata.name
+        title = ext.name
         summary = """
-            ${ext.metadata.lang} • ${ext.metadata.version.toVersionString()}
+            ${ext.lang} • ${ext.localMeta?.version?.toVersionString()} → ${ext.remoteMeta?.version?.toVersionString()}
         """.trimIndent()
-        updateExtensionIcon(ext.state)
+        updateExtensionIcon(ext.getState())
 
         setOnPreferenceClickListener {
-            val identity = ext.identity
-
             val items = arrayOf(
                 "Install/Update",
                 "Uninstall",
@@ -234,8 +232,8 @@ class ShosetsuSettings :
                     updateExtensionIcon(ExtensionState.Processing)
 
                     when (which) {
-                        0 -> installExtension(identity)
-                        1 -> uninstallExtension(identity)
+                        0 -> installExtension(ext)
+                        1 -> uninstallExtension(ext)
                     }
                 }
                 .show()
@@ -284,13 +282,13 @@ class ShosetsuSettings :
         )
     }
 
-    fun Preference.installExtension(identity: ExtensionIdentity) = performExtensionAction(
-        action = { ExtensionManager.downloadExtension(identity) != null },
+    fun Preference.installExtension(ext: ShosetsuExtension) = performExtensionAction(
+        action = { ExtensionManager.downloadExtension(ext) != null },
         successState = ExtensionState.Installed,
     )
 
-    fun Preference.uninstallExtension(identity: ExtensionIdentity) = performExtensionAction(
-        action = { ExtensionManager.deleteExtension(identity) },
+    fun Preference.uninstallExtension(ext: ShosetsuExtension) = performExtensionAction(
+        action = { ExtensionManager.deleteExtension(ext) },
         successState = ExtensionState.Removed,
     )
 

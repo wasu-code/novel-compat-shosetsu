@@ -1,6 +1,7 @@
 package eu.kanade.tachiyomi.novelextension.all.shosetsu
 
 import android.util.Log
+import app.shosetsu.lib.IExtension
 import app.shosetsu.lib.Version
 import app.shosetsu.lib.json.RepoExtension
 import app.shosetsu.lib.lua.LuaExtension
@@ -8,23 +9,37 @@ import app.shosetsu.lib.lua.LuaLibrary
 import java.io.File
 import java.net.HttpURLConnection
 import java.net.URL
+import java.security.MessageDigest
+import java.util.concurrent.ConcurrentHashMap
 
-class ShosetsuExtension(
-    val metadata: RepoExtension,
-    repoUrl: String,
-) {
-    val identity = metadata.toIdentity(repoUrl)
-    private val extensionFile = ExtensionManager.getExtensionFile(identity)
-    val isInstalled = extensionFile.exists()
-    val localMetadata = if (isInstalled) {
-        withExtensionClassLoader(javaClass.classLoader!!) { LuaExtension(extensionFile) }.exMetaData
-    } else {
-        null
+fun sha256(input: String): String {
+    val digest = MessageDigest.getInstance("SHA-256")
+    return digest.digest(input.toByteArray())
+        .joinToString("") { "%02x".format(it) }
+}
+
+object ExtensionRegistry {
+    private val map = ConcurrentHashMap<Pair<String, Hash>, ShosetsuExtension>()
+
+    fun getOrCreate(lang: String, hash: Hash): ShosetsuExtension = map.getOrPut(lang to hash) {
+        ShosetsuExtension(lang, hash)
     }
-    val state = when {
-        localMetadata!=null && metadata.version > localMetadata.version -> ExtensionState.UpdatePending
-        isInstalled -> ExtensionState.Installed
-        else -> ExtensionState.Available
+
+    fun all(): Collection<ShosetsuExtension> = map.values
+}
+
+typealias Hash = String
+object ExtensionCache {
+    private val installed = ConcurrentHashMap<Hash, Boolean>()
+
+    fun setInstalled(hash: Hash, value: Boolean) {
+        installed[hash] = value
+    }
+
+    fun isInstalled(hash: Hash): Boolean = installed[hash] == true
+
+    fun invalidate(hash: Hash) {
+        installed.remove(hash)
     }
 }
 
@@ -51,25 +66,64 @@ sealed class ExtensionState {
     data object Removed : ExtensionState()
 }
 
-data class ExtensionIdentity(
-    val repoUrl: String,
-    val lang: String,
-    val fileName: String,
-) {
-    val id: Int get() = listOf(repoUrl, lang, fileName).joinToString("\u0000").hashCode()
-}
+class ShosetsuExtension(val lang: String, val hash: Hash) {
+    var repoUrl: String? = null
+    var localMeta: IExtension.ExMetaData? = null
+    var remoteMeta: RepoExtension? = null
 
-fun RepoExtension.toIdentity(repoUrl: String) = ExtensionIdentity(
-    repoUrl = repoUrl.trimEnd('/'),
-    lang = lang,
-    fileName = fileName,
-)
+    val name: String
+        get() = remoteMeta?.name ?: hash
 
-object ExtensionCache {
+    val id: Int?
+        get() = remoteMeta?.id ?: localMeta?.id
 
+    fun loadLuaExtension(): LuaExtension {
+        val file = ExtensionManager.getExtensionFile(lang, hash)
+        return LuaExtension(file).also {
+            localMeta = it.exMetaData
+        }
+    }
+
+    val isInstalled: Boolean
+        get() = ExtensionCache.isInstalled(hash)
+
+    val hasUpdate: Boolean
+        get() = (remoteMeta?.version ?: return false) >
+            (localMeta?.version ?: return false)
+
+    fun getState() = when {
+        hasUpdate -> ExtensionState.UpdatePending
+
+        isInstalled ->
+            ExtensionState.Installed
+
+        else ->
+            ExtensionState.Available
+    }
+
+    companion object {
+        fun fromFile(file: File): ShosetsuExtension {
+            val lang = file.parentFile?.name ?: "all"
+            val hash = file.nameWithoutExtension
+
+            return ExtensionRegistry.getOrCreate(lang, hash).also {
+                ExtensionCache.setInstalled(hash, true)
+            }
+        }
+
+        fun fromRemote(ext: RepoExtension, repoUrl: String): ShosetsuExtension {
+            val hash = sha256("$repoUrl|${ext.lang}|${ext.fileName}")
+
+            return ExtensionRegistry.getOrCreate(ext.lang, hash).also {
+                it.repoUrl = repoUrl
+                it.remoteMeta = ext
+            }
+        }
+    }
 }
 
 object ExtensionManager {
+
     private lateinit var srcDir: File
     private lateinit var libDir: File
 
@@ -79,102 +133,62 @@ object ExtensionManager {
     }
 
     private fun requireInit() {
-        check(::srcDir.isInitialized) {
-            "ExtensionManager.init(filesDir) must be called before using ExtensionManager"
-        }
+        check(::srcDir.isInitialized)
     }
 
-//  === Paths =================================================================
+    // FILE RESOLUTION
 
-    fun getExtensionFile(identity: ExtensionIdentity): File {
-        requireInit()
-        return File(srcDir, "${identity.lang}/${identity.id}.lua")
-    }
+    fun getExtensionFile(lang: String, hash: Hash): File = File(srcDir, "$lang/$hash.lua")
 
-    fun getLibraryFile(name: String): File {
-        requireInit()
-        return File(libDir, "$name.lua")
-    }
+    // DOWNLOAD EXTENSION
 
-    fun isInstalled(identity: ExtensionIdentity): Boolean = getExtensionFile(identity).exists()
-
-    fun isLibraryInstalled(name: String): Boolean = getLibraryFile(name).exists()
-
-//  === Download ==============================================================
-
-    fun downloadExtension(identity: ExtensionIdentity): File? {
+    fun downloadExtension(ext: ShosetsuExtension): File? {
         requireInit()
 
-        val destFile = getExtensionFile(identity)
+        val destFile = getExtensionFile(ext.lang, ext.hash)
+        destFile.parentFile?.mkdirs()
         val tempFile = File(destFile.absolutePath + ".tmp")
 
-        val remoteUrl = URL(
-            URL(identity.repoUrl + "/"),
-            "src/${identity.lang}/${identity.fileName}.lua",
-        )
+        val url = URL(URL("${ext.repoUrl}/"), "src/${ext.lang}/${ext.remoteMeta!!.fileName}.lua")
 
-        // download to temp first
-        val tempResult = download(remoteUrl, tempFile) ?: return null
-
-        // load the extension to get its name and formatterID
-        val incomingExt = try {
-            withExtensionClassLoader(javaClass.classLoader!!) {
-                LuaExtension(tempResult)
+        return try {
+            val conn = (url.openConnection() as HttpURLConnection).apply {
+                connectTimeout = 15_000
+                readTimeout = 15_000
             }
-        } catch (e: Exception) {
-            Log.e("ExtensionManager", "Failed to load downloaded extension for conflict check", e)
-            tempFile.delete()
-            return null
-        }
 
-        // check against all installed extensions for host app ID conflict
-        // TODO keep some index to avoid re-parsing files every time
-        val conflict = getInstalledExtensions()
-            .filter { it.absolutePath != destFile.absolutePath } // ignore self (reinstall/update case)
-            .any { installedFile ->
-                try {
-                    val installedExt = LuaExtension(installedFile)
-                    val installedLang = installedFile.parentFile?.name ?: "all"
+            conn.inputStream.use { input ->
+                tempFile.outputStream().use(input::copyTo)
+            }
 
-                    installedLang == identity.lang &&
-                        installedExt.name == incomingExt.name &&
-                        installedExt.formatterID == incomingExt.formatterID
-                } catch (e: Exception) {
-                    Log.w("ExtensionManager", "Failed to load installed extension ${installedFile.name} for conflict check", e)
-                    false
+            val isConflict = ExtensionRegistry.all()
+                .filter { it.hash != ext.hash }
+                .any {
+                    // ID for host app is created from lang/name/formattedID
+                    // we check if there is any extension installed that uses it
+                    it.isInstalled && it.lang == ext.lang && it.name == ext.name && it.id == ext.id
                 }
+
+            if (isConflict) {
+                Log.e("ExtensionManager", "Extension ${ext.name} conflicts with an existing extension (same lang+name+formatterID). Download blocked.")
+                tempFile.delete()
+                return null
             }
 
-        if (conflict) {
-            Log.e("ExtensionManager", "Extension ${identity.fileName} conflicts with an existing extension (same lang+name+formatterID). Download blocked.")
-            tempFile.delete()
-            return null
-        }
+            if (destFile.exists()) destFile.delete()
+            check(tempFile.renameTo(destFile)) { "Failed to rename temp file to $destFile" }
 
-        // no conflict → commit
-        if (destFile.exists()) destFile.delete()
-        return if (tempFile.renameTo(destFile)) {
             destFile.setReadOnly()
+
+            // parse once → cache immediately
+            ExtensionCache.setInstalled(ext.hash, true)
+
             destFile
-        } else {
-            Log.e("ExtensionManager", "Failed to rename temp to dest for ${identity.fileName}")
+        } catch (e: Exception) {
+            Log.e("ExtensionManager", "Download failed: $url", e)
             tempFile.delete()
             null
         }
-    }
-
-    fun downloadLibrary(repoUrl: String, name: String, version: Version): File? {
-        requireInit()
-
-        val libFile = getLibraryFile(name)
-        if (libFile.exists()) {
-            // compare versions
-            val currentVersion = LuaLibrary(libFile).libMetaData.version
-            if (version >= currentVersion) return libFile
-        }
-
-        val remoteUrl = URL(URL(repoUrl.trimEnd('/') + "/"), "lib/$name.lua")
-        return download(remoteUrl, getLibraryFile(name))
     }
 
     private fun download(remoteUrl: URL, destFile: File): File? {
@@ -209,42 +223,47 @@ object ExtensionManager {
         }
     }
 
-//  === Delete ================================================================
-
-    fun deleteExtension(identity: ExtensionIdentity): Boolean = getExtensionFile(identity).let { it.exists() && it.delete() }
-
-    fun deleteLibrary(name: String): Boolean = getLibraryFile(name).let { it.exists() && it.delete() }
-
-    fun deleteAllExtensions(): Boolean {
+    fun downloadLibrary(repoUrl: String, name: String, version: Version): File? {
         requireInit()
-        return srcDir.deleteRecursively().also { srcDir.mkdirs() }
+
+        val libFile = getLibraryFile(name)
+        if (libFile.exists()) {
+            // compare versions
+            val currentVersion = LuaLibrary(libFile).libMetaData.version
+            if (version >= currentVersion) return libFile
+        }
+
+        val remoteUrl = URL(URL(repoUrl.trimEnd('/') + "/"), "lib/$name.lua")
+        return download(remoteUrl, getLibraryFile(name))
     }
 
-    fun deleteAllLibraries(): Boolean {
-        requireInit()
-        return libDir.deleteRecursively().also { libDir.mkdirs() }
-    }
+    // FILE SCAN
 
-    fun deleteAll(): Boolean {
+    fun getInstalledExtensionsFiles(): List<File> {
         requireInit()
-        return deleteAllExtensions() && deleteAllLibraries()
-    }
 
-//  === Installed =============================================================
-
-    fun getInstalledExtensions(): List<File> {
-        requireInit()
-        return srcDir
-            .walkTopDown()
+        return srcDir.walkTopDown()
             .filter { it.isFile && it.extension == "lua" }
             .toList()
     }
 
-    fun getInstalledLibraries(): List<File> {
+    fun getLibraryFile(name: String): File {
         requireInit()
-        return libDir
-            .listFiles { it.isFile && it.extension == "lua" }
-            ?.toList()
-            ?: emptyList()
+        return File(libDir, "$name.lua")
+    }
+
+//  === Delete ================================================================
+
+    fun deleteExtension(ext: ShosetsuExtension): Boolean {
+        requireInit()
+
+        val file = getExtensionFile(ext.lang, ext.hash)
+        val ok = file.exists() && file.delete()
+
+        if (ok) {
+            ExtensionCache.invalidate(ext.hash)
+        }
+
+        return ok
     }
 }
