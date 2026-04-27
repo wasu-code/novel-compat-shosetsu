@@ -214,7 +214,7 @@ class ShosetsuSettings :
     ): Preference = newPreference(context) {
         title = ext.name
         summary = """
-            ${ext.lang} • ${ext.localMeta?.version?.toVersionString()} → ${ext.remoteMeta?.version?.toVersionString()}
+            ${ext.lang} • ${ext.getVersionString()}
         """.trimIndent()
         updateExtensionIcon(ext.getState())
 

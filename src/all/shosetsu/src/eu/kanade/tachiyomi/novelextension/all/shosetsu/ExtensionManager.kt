@@ -101,6 +101,11 @@ class ShosetsuExtension(val lang: String, val hash: Hash) {
             ExtensionState.Available
     }
 
+    fun getVersionString(): String {
+        if (hasUpdate) return "${localMeta?.version?.toVersionString()} → ${remoteMeta?.version?.toVersionString()}"
+        return localMeta?.version?.toVersionString() ?: remoteMeta?.version?.toVersionString() ?: "?"
+    }
+
     companion object {
         fun fromFile(file: File): ShosetsuExtension {
             val lang = file.parentFile?.name ?: "all"
