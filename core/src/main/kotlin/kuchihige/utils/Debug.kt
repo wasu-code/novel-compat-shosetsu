@@ -4,9 +4,12 @@ package kuchihige.utils
  * Logs the value along with caller location, thread name, and type.
  *
  * Returns the receiver unchanged for easy chaining.
+ *
+ * @param m (message) prepend log message with this text
+ * @param t (tag) tag to be used for log message
  */
 @Suppress("UNUSED")
-fun <T> T.log(tag: String = "Kuchihige"): T {
+fun <T> T.log(m: String = "", t: String = "Kuchihige"): T {
     val stack = Throwable().stackTrace
     // stack[0] is this line, so stack[1] is the T.log(...), stack[2] is the caller
     val caller = stack.getOrNull(2)
@@ -23,7 +26,7 @@ fun <T> T.log(tag: String = "Kuchihige"): T {
         it::class.qualifiedName ?: it::class.simpleName
     } ?: "null"
 
-    val message = """
+    val message = """$m
         𝕧:  $this
             → $location
           𝕞:  $method
@@ -31,7 +34,7 @@ fun <T> T.log(tag: String = "Kuchihige"): T {
           𝕋:  $type
     """.trimIndent()
 
-    android.util.Log.d(tag, message)
+    android.util.Log.d(t, message)
 
     return this
 }
