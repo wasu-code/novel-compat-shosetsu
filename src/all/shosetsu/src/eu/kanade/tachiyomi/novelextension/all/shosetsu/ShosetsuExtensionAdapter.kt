@@ -365,7 +365,9 @@ class ShosetsuExtensionAdapter(private val ext: LuaExtension, language: String) 
                         from repo: ${meta.repo}
                     """.trimIndent()
                 } catch (_: InvalidMetaDataException) {
-                    "Can't load metadata for this extension"
+                    "Extension provided invalid metadata"
+                } catch (e: Exception) {
+                    "Error during loading metadata for this extension: ${e.message}"
                 }
                 setEnabled(false)
                 setIconReflect(android.R.drawable.ic_menu_info_details)
