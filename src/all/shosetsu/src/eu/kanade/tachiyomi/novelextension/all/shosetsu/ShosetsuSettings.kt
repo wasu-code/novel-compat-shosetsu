@@ -23,6 +23,7 @@ import rx.Observable
 import uy.kohesive.injekt.Injekt
 import uy.kohesive.injekt.api.get
 import java.util.Locale
+import java.util.concurrent.CountDownLatch
 
 class ShosetsuSettings :
     Source,
@@ -84,6 +85,10 @@ class ShosetsuSettings :
             dialogMessage = "One per line"
         }.also(screen::addPreference)
 
+        val filterCategory = PreferenceCategory(screen.context).apply {
+            summary = "Limit the amount of extensions on the list"
+        }.also(screen::addPreference)
+
         val enabledRepos = MultiSelectListPreference(screen.context).apply {
             key = "ENABLED_REPOS"
             title = "Select repositories"
@@ -93,11 +98,7 @@ class ShosetsuSettings :
             entryValues = repos.toTypedArray()
             values = values.intersect(repos)
             setDefaultValue(repos)
-        }.also(screen::addPreference)
-
-        val filterCategory = PreferenceCategory(screen.context).apply {
-            summary = "Limit the amount of extensions on the list"
-        }.also(screen::addPreference)
+        }.also(filterCategory::addPreference)
 
         val languageFilter = MultiSelectListPreference(screen.context).apply {
             key = "LANG_FILTER"
@@ -137,13 +138,14 @@ class ShosetsuSettings :
     private fun updateRepoList(screen: PreferenceScreen, repoSet: Set<String> = emptySet(), languageSet: Set<String> = emptySet()) {
         val context = screen.context
 
-        val repos = repoSet.map { it.trim() }
-            .filter { it.isNotEmpty() }
+        val repos = repoSet.map { it.trim() }.filter { it.isNotEmpty() }
 
         val toRemove = (0 until getPreferenceCount(screen))
             .mapNotNull { getPreference(screen, it) }
             .filter { it.key?.startsWith("repo_") == true }
         toRemove.forEach { removePreference(screen, it) }
+
+        val latch = CountDownLatch(repos.size)
 
         repos.forEachIndexed { index, repoUrl ->
             val category = PreferenceCategory(context).apply {
@@ -164,23 +166,21 @@ class ShosetsuSettings :
                 try {
                     val repo = RepositoryManager.getRepo(repoUrl)
                     val extensions = repo.extensions.map { ShosetsuExtension.fromRemote(it, repoUrl) }
-                    val filteredExtensions = extensions.filter {
-                        it.lang in languageSet
-                    }
-                    val libraries = repo.libraries
+                    val filteredExtensions = extensions.filter { it.lang in languageSet }
 
                     runOnMain {
                         category.removeAll()
                         if (filteredExtensions.isEmpty()) {
                             category.addPreference(
                                 newPreference(context) {
-                                    title = if (extensions.isEmpty()) "No extensions found" else "No extension match selected filters"
+                                    title = if (extensions.isEmpty()) "No extensions found" else "No extensions match selected filters"
                                     setEnabled(false)
                                 },
                             )
                         } else {
                             filteredExtensions.sortedWith(
-                                compareByDescending<ShosetsuExtension> { it.isInstalled }
+                                compareByDescending<ShosetsuExtension> { it.hasUpdate }
+                                    .thenByDescending { it.isInstalled }
                                     .thenBy { it.name },
                             ).forEach { ext ->
                                 category.addPreference(createExtensionPreference(context, ext))
@@ -188,7 +188,7 @@ class ShosetsuSettings :
                         }
                     }
 
-                    libraries.forEach { lib ->
+                    repo.libraries.forEach { lib ->
                         ExtensionManager.downloadLibrary(repoUrl, lib.name, lib.version)
                     }
                 } catch (e: Exception) {
@@ -202,6 +202,28 @@ class ShosetsuSettings :
                                 setEnabled(false)
                             },
                         )
+                    }
+                } finally {
+                    latch.countDown()
+                }
+            }
+        }
+
+        launchIO {
+            latch.await()
+
+            runOnMain {
+                val orphanedExtensions = ExtensionRegistry.orphaned()
+                if (orphanedExtensions.isNotEmpty()) {
+                    val orphanedCategory = PreferenceCategory(context).apply {
+                        key = "repo_unknown"
+                        title = "Orphaned extensions"
+                        summary = "Enable all repos to determine which are truly obsolete."
+                        initialExpandedChildrenCount = 3
+                    }.also(screen::addPreference)
+
+                    orphanedExtensions.forEach { ext ->
+                        orphanedCategory.addPreference(createExtensionPreference(context, ext))
                     }
                 }
             }

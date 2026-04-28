@@ -50,6 +50,17 @@ object ExtensionRegistry {
         ShosetsuExtension(lang, hash)
     }
 
+    /**
+     * Returns extensions that have no associated repository.
+     *
+     * This can happen when:
+     * - The extension is obsolete and was removed from its repository.
+     * - The repository was never loaded (i.e. not enabled in settings since the app started).
+     */
+    fun orphaned(): Collection<ShosetsuExtension> = map.values.filter {
+        it.repoUrl == null
+    }
+
     fun all(): Collection<ShosetsuExtension> = map.values
 }
 
@@ -60,7 +71,7 @@ class ShosetsuExtension(val lang: String, val hash: Hash) {
     var remoteMeta: RepoExtension? = null
 
     val name: String
-        get() = remoteMeta?.name ?: hash
+        get() = remoteMeta?.name ?: localMeta?.id?.let { "ID $it" } ?: hash
 
     val id: Int?
         get() = remoteMeta?.id ?: localMeta?.id
@@ -78,12 +89,9 @@ class ShosetsuExtension(val lang: String, val hash: Hash) {
 
     fun getState() = when {
         hasUpdate -> ExtensionState.UpdatePending
-
-        isInstalled ->
-            ExtensionState.Installed
-
-        else ->
-            ExtensionState.Available
+        isInstalled && repoUrl == null -> ExtensionState.Orphaned
+        isInstalled -> ExtensionState.Installed
+        else -> ExtensionState.Available
     }
 
     fun getVersionString(): String {
