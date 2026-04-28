@@ -93,7 +93,7 @@ class ShosetsuSettings :
             key = "ENABLED_REPOS"
             title = "Select repositories"
             summary = "Enable/disable repositories to display extensions (and load libraries) from"
-            val repos = reposPref.text.split("\n").toSet()
+            val repos = (reposPref.text ?: "").split("\n").map { it.trim() }.filter { it.isNotEmpty() }.toSet()
             entries = repos.map { tryParseRepoName(it) }.toTypedArray()
             entryValues = repos.toTypedArray()
             values = values.intersect(repos)
