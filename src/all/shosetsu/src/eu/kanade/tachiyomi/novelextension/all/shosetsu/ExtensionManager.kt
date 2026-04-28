@@ -12,35 +12,12 @@ import java.net.URL
 import java.security.MessageDigest
 import java.util.concurrent.ConcurrentHashMap
 
+typealias Hash = String
+
 fun sha256(input: String): String {
     val digest = MessageDigest.getInstance("SHA-256")
     return digest.digest(input.toByteArray())
         .joinToString("") { "%02x".format(it) }
-}
-
-object ExtensionRegistry {
-    private val map = ConcurrentHashMap<Pair<String, Hash>, ShosetsuExtension>()
-
-    fun getOrCreate(lang: String, hash: Hash): ShosetsuExtension = map.getOrPut(lang to hash) {
-        ShosetsuExtension(lang, hash)
-    }
-
-    fun all(): Collection<ShosetsuExtension> = map.values
-}
-
-typealias Hash = String
-object ExtensionCache {
-    private val installed = ConcurrentHashMap<Hash, Boolean>()
-
-    fun setInstalled(hash: Hash, value: Boolean) {
-        installed[hash] = value
-    }
-
-    fun isInstalled(hash: Hash): Boolean = installed[hash] == true
-
-    fun invalidate(hash: Hash) {
-        installed.remove(hash)
-    }
 }
 
 sealed class ExtensionState {
@@ -66,8 +43,19 @@ sealed class ExtensionState {
     data object Removed : ExtensionState()
 }
 
+object ExtensionRegistry {
+    private val map = ConcurrentHashMap<Pair<String, Hash>, ShosetsuExtension>()
+
+    fun getOrCreate(lang: String, hash: Hash): ShosetsuExtension = map.getOrPut(lang to hash) {
+        ShosetsuExtension(lang, hash)
+    }
+
+    fun all(): Collection<ShosetsuExtension> = map.values
+}
+
 class ShosetsuExtension(val lang: String, val hash: Hash) {
     var repoUrl: String? = null
+    var isInstalled: Boolean = false
     var localMeta: IExtension.ExMetaData? = null
     var remoteMeta: RepoExtension? = null
 
@@ -83,9 +71,6 @@ class ShosetsuExtension(val lang: String, val hash: Hash) {
             localMeta = it.exMetaData
         }
     }
-
-    val isInstalled: Boolean
-        get() = ExtensionCache.isInstalled(hash)
 
     val hasUpdate: Boolean
         get() = (remoteMeta?.version ?: return false) >
@@ -112,7 +97,7 @@ class ShosetsuExtension(val lang: String, val hash: Hash) {
             val hash = file.nameWithoutExtension
 
             return ExtensionRegistry.getOrCreate(lang, hash).also {
-                ExtensionCache.setInstalled(hash, true)
+                it.isInstalled = true
             }
         }
 
@@ -185,8 +170,7 @@ object ExtensionManager {
 
             destFile.setReadOnly()
 
-            // parse once → cache immediately
-            ExtensionCache.setInstalled(ext.hash, true)
+            ext.isInstalled = true
 
             destFile
         } catch (e: Exception) {
@@ -266,7 +250,7 @@ object ExtensionManager {
         val ok = file.exists() && file.delete()
 
         if (ok) {
-            ExtensionCache.invalidate(ext.hash)
+            ext.isInstalled = false
         }
 
         return ok
