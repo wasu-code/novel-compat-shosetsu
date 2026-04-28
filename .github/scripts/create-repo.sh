@@ -25,7 +25,7 @@ for APK in ${APKS[@]}; do
     APPLICATION=$(echo "$BADGING" | grep application:)
     LABEL=$(echo $APPLICATION | grep -Po "label='\K[^']+")
 
-    LANG=$(echo $APK | grep -Po "tachiyomi-\K[^\.]+")
+    LANG=$(echo $APK | grep -Po "tsundoku-\K[^\.]+")
 
     ICON=$(echo "$BADGING" | grep -Po "application-icon-320.*'\K[^']+")
     unzip -p $APK $ICON > icon/${PKGNAME}.png
@@ -43,6 +43,8 @@ for APK in ${APKS[@]}; do
         fi
     fi
 
+    NOVEL=$(echo $BADGING | grep -Po "tachiyomi.extension.novel' value='\K[^']+" || echo "0")
+
     jq -n \
         --arg name "$LABEL" \
         --arg pkg "$PKGNAME" \
@@ -51,8 +53,9 @@ for APK in ${APKS[@]}; do
         --argjson code $VCODE \
         --arg version "$VNAME" \
         --argjson nsfw $NSFW \
+        --argjson novel $NOVEL \
         --argjson sources "$SOURCE_INFO" \
-        '{name:$name, pkg:$pkg, apk:$apk, lang:$lang, code:$code, version:$version, nsfw:$nsfw, sources:$sources}'
+        '{name:$name, pkg:$pkg, apk:$apk, lang:$lang, code:$code, version:$version, nsfw:$nsfw, isNovel:($novel == "1"), sources:$sources}'
 
 done | jq -sr '[.[]]' > index.json
 
