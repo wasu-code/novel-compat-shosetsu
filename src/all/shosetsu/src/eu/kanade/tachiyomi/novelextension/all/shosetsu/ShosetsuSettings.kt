@@ -119,6 +119,25 @@ class ShosetsuSettings :
             setDefaultValue(setOf("all", userLang))
         }.also(filterCategory::addPreference)
 
+        reposPref.setOnPreferenceChangeListener { _, newValue ->
+            enabledRepos.apply {
+                val repos = (newValue as String).split("\n").map { it.trim() }.filter { it.isNotEmpty() }.toSet()
+                entries = repos.map { tryParseRepoName(it) }.toTypedArray()
+                entryValues = repos.toTypedArray()
+
+                // Fix invalid stored values
+                val current = values ?: emptySet()
+
+                @Suppress("unchecked_cast")
+                val valid = current.intersect(repos)
+
+                if (valid != current) {
+                    values = valid
+                }
+            }
+            true
+        }
+
         enabledRepos.setOnPreferenceChangeListener { _, newValue ->
             @Suppress("unchecked_cast")
             updateRepoList(screen, newValue as Set<String>, languageFilter.values)
