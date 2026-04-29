@@ -21,10 +21,10 @@
   {
     "name": "NovelApp: Shosetsu",
     "pkg": "eu.kanade.tachiyomi.novelextension.all.shosetsu",
-    "apk": "tsundoku-all.shosetsu-v1.4.2.apk",
+    "apk": "tsundoku-all.shosetsu-v1.4.3.apk",
     "lang": "all",
-    "code": 2,
-    "version": "1.4.2",
+    "code": 3,
+    "version": "1.4.3",
     "nsfw": 0,
     "isNovel": true,
     "sources": []
