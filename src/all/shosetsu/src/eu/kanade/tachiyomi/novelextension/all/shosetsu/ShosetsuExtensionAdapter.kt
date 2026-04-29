@@ -198,7 +198,7 @@ class ShosetsuExtensionAdapter(private val ext: LuaExtension, language: String) 
         val chapters = ext
             .parseNovel(novel.url, true)
             .chapters
-            .map { it.toSChapter() }
+            .map { it.toSChapter(lang) }
             .reversed()
         return Observable.just(chapters)
     }

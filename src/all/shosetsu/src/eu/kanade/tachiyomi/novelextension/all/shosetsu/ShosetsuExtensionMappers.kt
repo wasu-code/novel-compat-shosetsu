@@ -1,15 +1,12 @@
 package eu.kanade.tachiyomi.novelextension.all.shosetsu
 
+import android.os.Build
 import app.shosetsu.lib.Novel
 import eu.kanade.tachiyomi.source.model.Filter
 import eu.kanade.tachiyomi.source.model.SChapter
 import novelsurcery.utils.setAltTitles
 import app.shosetsu.lib.Filter as ShosetsuFilter
 import eu.kanade.tachiyomi.source.model.SManga as SNovel
-
-// private val dateFormat = SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss.SSS'Z'", Locale.ROOT).apply {
-//    timeZone = TimeZone.getTimeZone("UTC")
-// }
 
 fun Novel.Status.toSNovelStatus(): Int = when (this) {
     Novel.Status.COMPLETED -> SNovel.COMPLETED
@@ -30,10 +27,12 @@ fun Novel.Info.toSNovel(): SNovel = SNovel.create().apply {
     setAltTitles(this@toSNovel.alternativeTitles.asList())
 }
 
-fun Novel.Chapter.toSChapter(): SChapter = SChapter.create().apply {
+fun Novel.Chapter.toSChapter(lang: String = "all"): SChapter = SChapter.create().apply {
     url = link
     name = title
-//    date_upload = SimpleDateFormat().tryParse(release) // first need to guess the format
+    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+        parseSmartDateToMillis(release, lang)?.let { date_upload = it }
+    }
     chapter_number = order.toFloat()
 }
 
