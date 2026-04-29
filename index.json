@@ -1,24 +1,5 @@
 [
   {
-    "name": "NovelApp: Test Extension",
-    "pkg": "eu.kanade.tachiyomi.novelextension.all.noveltest",
-    "apk": "tsundoku-all.noveltest-v1.4.1.apk",
-    "lang": "all",
-    "code": 1,
-    "version": "1.4.1",
-    "nsfw": 0,
-    "isNovel": true,
-    "sources": [
-      {
-        "name": "Testowo",
-        "lang": "all",
-        "id": "446878626416404709",
-        "baseUrl": "https://example.com",
-        "versionId": 1
-      }
-    ]
-  },
-  {
     "name": "NovelApp: Shosetsu",
     "pkg": "eu.kanade.tachiyomi.novelextension.all.shosetsu",
     "apk": "tsundoku-all.shosetsu-v1.4.3.apk",
