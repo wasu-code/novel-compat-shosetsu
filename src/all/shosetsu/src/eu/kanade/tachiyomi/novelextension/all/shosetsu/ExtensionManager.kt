@@ -79,7 +79,7 @@ class ShosetsuExtension(val lang: String, val hash: Hash) {
     fun loadLuaExtension(): LuaExtension {
         val file = ExtensionManager.getExtensionFile(lang, hash)
         val content = injectLuaPatches(file.readText())
-        return LuaExtension(content).also {
+        return LuaExtension(content, "line - $LUA_PATCHES_length").also {
             localMeta = it.exMetaData
         }
     }

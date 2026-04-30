@@ -55,7 +55,7 @@ class ShosetsuFactory : SourceFactory {
                     val ext = ShosetsuExtension.fromFile(file)
                     ext.loadLuaExtension() to ext.lang
                 }
-//                .plus(LuaExtension(EXT, "DebugExt") to "all")
+//                .plus(LuaExtension(injectLuaPatches(EXT), "DebugExt") to "all")
         }
 
         return extensions

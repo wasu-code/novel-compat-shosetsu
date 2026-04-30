@@ -161,39 +161,42 @@ fun resolveLocale(lang: String): Locale = if (lang == "all") Locale.ENGLISH else
  * Need for those patches probably steams from changes to [okhttp3.OkHttp] library.
  * Kotlin-lib uses `4.12.0` while host app environment provided `5.3.2`.
  */
-fun injectLuaPatches(content: String) = content.replaceFirst("\n", "\n${FIX}\n")
+fun injectLuaPatches(content: String) = content.replaceFirst("\n", "\n${LUA_PATCHES}\n")
 
-private const val FIX = """
-local _Request = Request
-local Request = function(req)
-    local res = _Request(req)
-    return setmetatable({}, {__index = function(_, k)
-        if k == "headers" then return function() return res.headers end end
-        if k == "body" then return function() return res.body end end
-        return res[k]
-    end})
-end
-
-local function wrapCookie(cookie)
-    return setmetatable({}, {__index = function(_, k)
-        if k == "name" then return function() return cookie.name end end
-        if k == "value" then return function() return cookie.value end end
-        return cookie[k]
-    end})
-end
-
-local _CookieJar = CookieJar
-local CookieJar = function()
-    local jar = _CookieJar()
-    local cookies = nil
-    return {
-        loadForRequest = function(_, url)
-            cookies = jar:loadForRequest(url)
-            return {
-                size = function() return cookies:size() end,
-                get = function(_, i) return wrapCookie(cookies:get(i)) end
-            }
+private const val LUA_PATCHES = """
+local function wrapCallable(obj)
+    return setmetatable({}, {
+        __index = function(_, k)
+            local v = obj[k]
+            if type(v) == "function" then
+                return function(self, ...)
+                    if self == _ then
+                        local result = v(obj, ...)
+                        if type(result) == "table" or type(result) == "userdata" then
+                            return wrapCallable(result)
+                        end
+                        return result
+                    end
+                    return v(self, ...)
+                end
+            end
+            return setmetatable({}, {
+                __index = function(_, k2) return v[k2] end,
+                __call = function() return v end,
+                __tostring = function() return tostring(v) end,
+            })
         end
-    }
+    })
 end
+
+local function wrapConstructor(fn)
+    return function(...)
+        return wrapCallable(fn(...))
+    end
+end
+
+local Request         = wrapConstructor(Request)
+local CookieJar       = wrapConstructor(CookieJar)
 """
+
+val LUA_PATCHES_length = LUA_PATCHES.split("\n").size + 1
