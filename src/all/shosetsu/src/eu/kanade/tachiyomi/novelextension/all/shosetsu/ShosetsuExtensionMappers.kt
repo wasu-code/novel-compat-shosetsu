@@ -60,13 +60,8 @@ fun ShosetsuFilter<*>.toFilter(): Filter<*> = when (this) {
     is ShosetsuFilter.RadioGroup -> ListFilter(name, choices.toTypedArray(), state)
     is ShosetsuFilter.Dropdown -> ListFilter(name, choices.toTypedArray(), state)
 
-    is ShosetsuFilter.Group<*> -> { // TODO check this
-        val listState = state
-            .toSortedMap() // ensures index order
-            .values
-            .toList()
-        GroupFilter(name, listState)
-    }
+    // TODO: ensure UI keeps state after clicking `Filter` button
+    is ShosetsuFilter.Group<*> -> GroupFilter(name, filters.map { it.toFilter() })
 
     else -> error("Unknown filter type: $this")
 }

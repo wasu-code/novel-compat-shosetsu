@@ -140,46 +140,39 @@ class ShosetsuExtensionAdapter(private val ext: LuaExtension, language: String) 
         // If query is not provided that is probably filtering, not search, and should still be handled
         if (!ext.hasSearch && query.isNotEmpty()) throw UnsupportedOperationException("Search not supported in this extensions")
 
+        /** Map of FilterID→value that are meant to be sent to Shosetsu search or getListing functions */
         val filterMap = mutableMapOf<Int, Any>(
             FID_QUERY to query,
             FID_PAGE to page,
         )
 
-        val filterByName = buildList {
+        /** Map of all filters from Shosetsu filter model as flatmap associated by filter name */
+        val shosetsuFilterByName = buildList {
             ext.searchFiltersModel.forEach { filter ->
                 when (filter) {
                     is ShosetsuFilter.FList -> addAll(filter.filters)
+                    is ShosetsuFilter.Group<*> -> addAll(filter.filters)
                     else -> add(filter)
                 }
             }
         }.associateBy { it.name }
 
+        /** Takes Tsundoku filter as param and adds its value to `filterMap` */
+        fun addFilter(f: Filter<*>) {
+            val shosetsuFilter = shosetsuFilterByName[f.name] ?: return
+            val value = f.state
+            if (value != null) {
+                filterMap[shosetsuFilter.id] = value
+            }
+        }
+
         filters.forEach { f ->
-            val shosetsuFilter = filterByName[f.name] ?: return@forEach
-
-            when (shosetsuFilter) {
-                is ShosetsuFilter.Group<*> -> {
-                    val stateList = f.state as? List<*> ?: emptyList<Any?>()
-
-                    shosetsuFilter.filters.forEach { inner ->
-                        val match = stateList.firstOrNull { item ->
-                            (item as? ShosetsuFilter<*>)?.name == inner.name
-                        }
-
-                        val value = (match as? ShosetsuFilter<*>)?.state
-
-                        if (value != null) {
-                            filterMap[inner.id] = value
-                        }
-                    }
+            if (f is Filter.Group<*>) {
+                f.state.forEach { inner ->
+                    addFilter(inner as Filter<*>)
                 }
-
-                else -> {
-                    val value = f.state
-                    if (value != null) {
-                        filterMap[shosetsuFilter.id] = value
-                    }
-                }
+            } else {
+                addFilter(f)
             }
         }
 
