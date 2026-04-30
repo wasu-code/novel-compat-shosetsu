@@ -15,6 +15,7 @@ import app.shosetsu.lib.Novel
 import app.shosetsu.lib.exceptions.InvalidMetaDataException
 import app.shosetsu.lib.lua.LuaExtension
 import eu.kanade.tachiyomi.source.ConfigurableSource
+import eu.kanade.tachiyomi.source.model.Filter
 import eu.kanade.tachiyomi.source.model.FilterList
 import eu.kanade.tachiyomi.source.model.Page
 import eu.kanade.tachiyomi.source.model.SChapter
@@ -123,17 +124,20 @@ class ShosetsuExtensionAdapter(private val ext: LuaExtension, language: String) 
     override fun latestUpdatesRequest(page: Int): Request = throw UnsupportedOperationException("Not used")
 
     override fun getFilterList(): FilterList = FilterList(
-        ext.searchFiltersModel.flatMap { filter ->
-            when (filter) {
-                is ShosetsuFilter.FList -> filter.filters.map { it.toFilter() }
-                else -> listOf(filter.toFilter())
+        buildList {
+            add(ListFilter("Apply filters to:", arrayOf("Search", "Primary listing", "Secondary listing"), 0))
+            add(Filter.Separator())
+            ext.searchFiltersModel.forEach { filter ->
+                when (filter) {
+                    is ShosetsuFilter.FList -> addAll(filter.filters.map { it.toFilter() })
+                    else -> add(filter.toFilter())
+                }
             }
         },
     )
 
     override fun fetchSearchNovels(page: Int, query: String, filters: FilterList): Observable<NovelsPage> {
         // If query is not provided that is probably filtering, not search, and should still be handled
-        // TODO: Should filtering use .search or .getListing?
         if (!ext.hasSearch && query.isNotEmpty()) throw UnsupportedOperationException("Search not supported in this extensions")
 
         val filterMap = mutableMapOf<Int, Any>(
@@ -141,14 +145,14 @@ class ShosetsuExtensionAdapter(private val ext: LuaExtension, language: String) 
             FID_PAGE to page,
         )
 
-        val filterByName = ext.searchFiltersModel
-            .flatMap { filter ->
+        val filterByName = buildList {
+            ext.searchFiltersModel.forEach { filter ->
                 when (filter) {
-                    is ShosetsuFilter.FList -> filter.filters
-                    else -> listOf(filter)
+                    is ShosetsuFilter.FList -> addAll(filter.filters)
+                    else -> add(filter)
                 }
             }
-            .associateBy { it.name }
+        }.associateBy { it.name }
 
         filters.forEach { f ->
             val shosetsuFilter = filterByName[f.name] ?: return@forEach
@@ -179,8 +183,14 @@ class ShosetsuExtensionAdapter(private val ext: LuaExtension, language: String) 
             }
         }
 
-        val novels = ext.search(filterMap)
-            .map { it.toSNovel() }
+        // Should filtering use .search or .getListing?
+        val filteringTarget = (filters[0] as ListFilter).state
+        val novels = when {
+            query.isNotEmpty() || filteringTarget == 0 -> ext.search(filterMap)
+            else -> {
+                ext.listings[filteringTarget - 1].getListing(filterMap)
+            }
+        }.map { it.toSNovel() }
 
         val hasNextPage = ext.isSearchIncrementing && novels.isNotEmpty()
 
