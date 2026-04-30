@@ -1,6 +1,14 @@
 package eu.kanade.tachiyomi.novelextension.all.shosetsu
 
+import android.content.Context
 import android.os.Build
+import androidx.preference.CheckBoxPreference
+import androidx.preference.DropDownPreference
+import androidx.preference.EditTextPreference
+import androidx.preference.ListPreference
+import androidx.preference.Preference
+import androidx.preference.PreferenceCategory
+import androidx.preference.SwitchPreferenceCompat
 import app.shosetsu.lib.Novel
 import eu.kanade.tachiyomi.source.model.Filter
 import eu.kanade.tachiyomi.source.model.SChapter
@@ -64,4 +72,52 @@ fun ShosetsuFilter<*>.toFilter(): Filter<*> = when (this) {
     is ShosetsuFilter.Group<*> -> GroupFilter(name, filters.map { it.toFilter() })
 
     else -> error("Unknown filter type: $this")
+}
+
+fun ShosetsuFilter<*>.toPreference(context: Context): Preference = when (this) {
+    is ShosetsuFilter.Text,
+    is ShosetsuFilter.Password,
+    -> EditTextPreference(context).apply {
+        setDefaultValue("")
+    }
+
+    is ShosetsuFilter.Switch -> SwitchPreferenceCompat(context).apply {
+        setDefaultValue(false)
+    }
+
+    is ShosetsuFilter.Checkbox -> CheckBoxPreference(context).apply {
+        setDefaultValue(false)
+    }
+
+    is ShosetsuFilter.Dropdown -> DropDownPreference(context).apply {
+        entries = choices.toTypedArray()
+        entryValues = Array(choices.size) { it.toString() }
+        setDefaultValue("0")
+    }
+
+    is ShosetsuFilter.RadioGroup -> ListPreference(context).apply {
+        entries = choices.toTypedArray()
+        entryValues = Array(choices.size) { it.toString() }
+        setDefaultValue("0")
+    }
+
+    is ShosetsuFilter.TriState -> DropDownPreference(context).apply {
+        entries = arrayOf("Default", "Include", "Exclude")
+        entryValues = arrayOf("0", "1", "2")
+        setDefaultValue("0")
+    }
+
+    is ShosetsuFilter.Header,
+    is ShosetsuFilter.Separator,
+    -> PreferenceCategory(context)
+
+    is ShosetsuFilter.FList,
+    is ShosetsuFilter.Group<*>,
+    -> PreferenceCategory(context)
+}.apply {
+    if (this !is PreferenceCategory) key = id.toString()
+    title = name
+
+    // ensure even long text can be read by user
+    if (name.length > 20) summary = name
 }
