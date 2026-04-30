@@ -93,7 +93,7 @@ class ShosetsuSettings :
             key = "ENABLED_REPOS"
             title = "Select repositories"
             summary = "Enable/disable repositories to display extensions (and load libraries) from"
-            val repos = (reposPref.text ?: "").split("\n").map { it.trim() }.filter { it.isNotEmpty() }.toSet()
+            val repos = parseRepos(reposPref.text ?: "")
             entries = repos.map { tryParseRepoName(it) }.toTypedArray()
             entryValues = repos.toTypedArray()
             values = values.intersect(repos)
@@ -121,7 +121,7 @@ class ShosetsuSettings :
 
         reposPref.setOnPreferenceChangeListener { _, newValue ->
             enabledRepos.apply {
-                val repos = (newValue as String).split("\n").map { it.trim() }.filter { it.isNotEmpty() }.toSet()
+                val repos = parseRepos(newValue as String)
                 entries = repos.map { tryParseRepoName(it) }.toTypedArray()
                 entryValues = repos.toTypedArray()
 
@@ -154,19 +154,24 @@ class ShosetsuSettings :
         updateRepoList(screen, enabledRepos.values, languageFilter.values)
     }
 
+    /** Parses provided text as list of repo URLs separated by new lines */
+    private fun parseRepos(text: String): Set<String> = text
+        .split("\n")
+        .map { it.trim().trimEnd('/') }
+        .filter { it.isNotEmpty() }
+        .toSet()
+
     private fun updateRepoList(screen: PreferenceScreen, repoSet: Set<String> = emptySet(), languageSet: Set<String> = emptySet()) {
         val context = screen.context
-
-        val repos = repoSet.map { it.trim() }.filter { it.isNotEmpty() }
 
         val toRemove = (0 until getPreferenceCount(screen))
             .mapNotNull { getPreference(screen, it) }
             .filter { it.key?.startsWith("repo_") == true }
         toRemove.forEach { removePreference(screen, it) }
 
-        val latch = CountDownLatch(repos.size)
+        val latch = CountDownLatch(repoSet.size)
 
-        repos.forEachIndexed { index, repoUrl ->
+        repoSet.forEachIndexed { index, repoUrl ->
             val category = PreferenceCategory(context).apply {
                 key = "repo_$index"
                 title = tryParseRepoName(repoUrl)
