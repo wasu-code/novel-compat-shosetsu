@@ -145,7 +145,7 @@ class ShosetsuExtensionAdapter(private val ext: LuaExtension, language: String) 
         /** Map of FilterID→value that are meant to be sent to Shosetsu search or getListing functions */
         val filterMap = mutableMapOf<Int, Any>(
             FID_QUERY to query,
-            FID_PAGE to page,
+            FID_PAGE to ext.startIndex + page - 1,
         )
 
         /** Map of all filters from Shosetsu filter model as flatmap associated by filter name */
@@ -180,16 +180,23 @@ class ShosetsuExtensionAdapter(private val ext: LuaExtension, language: String) 
 
         // Should filtering use .search or .getListing?
         val filteringTarget = (filters[0] as ListFilter).state
-        val novels = when {
-            query.isNotEmpty() || filteringTarget == 0 -> ext.search(filterMap)
-            else -> {
-                ext.listings[filteringTarget - 1].getListing(filterMap)
+        val (novels, hasNextPage) = when {
+            // Searching
+            query.isNotEmpty() || filteringTarget == 0 -> {
+                val novels = ext.search(filterMap)
+                val hasNextPage = ext.isSearchIncrementing && novels.isNotEmpty()
+                novels to hasNextPage
             }
-        }.map { it.toSNovel() }
+            // Filtering a listing
+            else -> {
+                val listing = ext.listings[filteringTarget - 1]
+                val novels = listing.getListing(filterMap)
+                val hasNextPage = listing.isIncrementing && novels.isNotEmpty()
+                novels to hasNextPage
+            }
+        }
 
-        val hasNextPage = ext.isSearchIncrementing && novels.isNotEmpty()
-
-        return Observable.just(NovelsPage(novels, hasNextPage))
+        return Observable.just(NovelsPage(novels.map { it.toSNovel() }, hasNextPage))
     }
 
     override fun searchNovelsParse(response: Response): NovelsPage = throw UnsupportedOperationException("Not used")
