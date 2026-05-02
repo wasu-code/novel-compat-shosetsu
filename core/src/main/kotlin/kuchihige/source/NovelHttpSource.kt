@@ -22,6 +22,10 @@ abstract class NovelHttpSource :
         TODO("Not yet implemented")
     }
 
+    open fun getNovelUrl(novel: SNovel): String = super.getMangaUrl(novel)
+
+    final override fun getMangaUrl(manga: SManga): String = getNovelUrl(manga)
+
     protected abstract fun novelDetailsParse(response: Response): SNovel
 
     final override fun mangaDetailsParse(response: Response): SManga = novelDetailsParse(response)

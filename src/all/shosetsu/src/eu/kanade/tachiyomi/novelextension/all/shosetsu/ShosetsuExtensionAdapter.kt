@@ -219,12 +219,16 @@ class ShosetsuExtensionAdapter(private val ext: LuaExtension, language: String) 
 
     override fun chapterListParse(response: Response): List<SChapter> = throw UnsupportedOperationException("Not used")
 
+    override fun getChapterUrl(chapter: SChapter): String = ext.expandURL(chapter.url, KEY_CHAPTER_URL)
+
     override fun fetchNovelDetails(novel: SNovel): Observable<SNovel> {
         val parsedNovel = ext.parseNovel(novel.url, false).toSNovel()
         return Observable.just(parsedNovel)
     }
 
     override fun novelDetailsParse(response: Response): SNovel = throw UnsupportedOperationException("Not used")
+
+    override fun getNovelUrl(novel: SNovel): String = ext.expandURL(novel.url, KEY_NOVEL_URL)
 
     override fun fetchPageList(chapter: SChapter): Observable<List<Page>> {
         val page = Page(0, chapter.url)
@@ -353,5 +357,9 @@ class ShosetsuExtensionAdapter(private val ext: LuaExtension, language: String) 
         // IDs of Filters passed to search or listing functions
         const val FID_QUERY = 0
         const val FID_PAGE = 1
+
+        // IDs of URL types
+        const val KEY_NOVEL_URL = 1
+        const val KEY_CHAPTER_URL = 2
     }
 }
