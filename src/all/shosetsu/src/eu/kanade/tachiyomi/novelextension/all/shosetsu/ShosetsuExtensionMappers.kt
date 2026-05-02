@@ -118,6 +118,8 @@ fun ShosetsuFilter<*>.toPreference(context: Context): Preference = when (this) {
     if (this !is PreferenceCategory) key = id.toString()
     title = name
 
-    // ensure even long text can be read by user
-    if (name.length > 20) summary = name
+    // make sure filter title is not ellipsized
+    Preference::class.java.methods
+        .firstOrNull { it.name == "setSingleLineTitle" }
+        ?.invoke(this, false)
 }
