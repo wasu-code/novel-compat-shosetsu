@@ -128,7 +128,9 @@ class ShosetsuExtensionAdapter(private val ext: LuaExtension, language: String) 
     override fun getFilterList(): FilterList = FilterList(
         buildList {
             add(ListFilter("Apply filters to:", arrayOf("Search", "Primary listing", "Secondary listing"), 1))
+            add(Filter.Header("When search query is provided filters will always be applied to search, regardless to the option selected above"))
             add(Filter.Separator())
+            // Filters provided by extension
             ext.searchFiltersModel.forEach { filter ->
                 when (filter) {
                     is ShosetsuFilter.FList -> addAll(filter.filters.map { it.toFilter() })
