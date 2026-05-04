@@ -7,6 +7,7 @@ import android.content.Intent
 import android.os.Handler
 import android.os.Looper
 import android.util.Log
+import android.widget.EditText
 import androidx.core.net.toUri
 import androidx.preference.EditTextPreference
 import androidx.preference.MultiSelectListPreference
@@ -77,7 +78,7 @@ class ShosetsuSettings :
             }
             .also(screen::addPreference)
 
-        val reposPref = EditTextPreference(screen.context).apply {
+        val allRepos = EditTextPreference(screen.context).apply {
             key = "REPOS"
             title = "Repositories"
             summary = "Add URLs of repositories providing Shosetsu extensions"
@@ -93,14 +94,14 @@ class ShosetsuSettings :
             key = "ENABLED_REPOS"
             title = "Select repositories"
             summary = "Enable/disable repositories to display extensions (and load libraries) from"
-            val repos = parseRepos(reposPref.text ?: "")
+            val repos = parseRepos(allRepos.text ?: "")
             entries = repos.map { tryParseRepoName(it) }.toTypedArray()
             entryValues = repos.toTypedArray()
             values = values.intersect(repos)
             setDefaultValue(repos)
         }.also(filterCategory::addPreference)
 
-        val languageFilter = MultiSelectListPreference(screen.context).apply {
+        val enabledLanguages = MultiSelectListPreference(screen.context).apply {
             key = "LANG_FILTER"
             title = "Filter by language"
             summary = "Initialized with your local language and multilingual extensions"
@@ -119,7 +120,41 @@ class ShosetsuSettings :
             setDefaultValue(setOf("all", userLang))
         }.also(filterCategory::addPreference)
 
-        reposPref.setOnPreferenceChangeListener { _, newValue ->
+        newPreference(screen.context) {
+            setIcon(android.R.drawable.ic_menu_search)
+            setOnPreferenceClickListener {
+                val input = EditText(screen.context).apply {
+                    setText(summary)
+                }
+
+                AlertDialog.Builder(screen.context)
+                    .setTitle("Search")
+                    .setMessage("Use global search to search across all languages and repos")
+                    .setPositiveButton("Search") { _, _ ->
+                        val query = input.text.toString()
+                        // Add search query to standard filters
+                        updateRepoList(screen, enabledRepos.values, enabledLanguages.values, query)
+                        summary = query
+                    }
+                    .setNeutralButton("Global search") { _, _ ->
+                        val query = input.text.toString()
+                        val repos = parseRepos(allRepos.text as String)
+                        // Search across all repos, don't filter by language
+                        updateRepoList(screen, repos, searchQuery = query)
+                        summary = query
+                    }
+                    .setNegativeButton("Clear") { _, _ ->
+                        // Apply standard filters
+                        updateRepoList(screen, enabledRepos.values, enabledLanguages.values)
+                        summary = ""
+                    }
+                    .setView(input)
+                    .show()
+                false
+            }
+        }.also(screen::addPreference)
+
+        allRepos.setOnPreferenceChangeListener { _, newValue ->
             enabledRepos.apply {
                 val repos = parseRepos(newValue as String)
                 entries = repos.map { tryParseRepoName(it) }.toTypedArray()
@@ -140,18 +175,18 @@ class ShosetsuSettings :
 
         enabledRepos.setOnPreferenceChangeListener { _, newValue ->
             @Suppress("unchecked_cast")
-            updateRepoList(screen, newValue as Set<String>, languageFilter.values)
+            updateRepoList(screen, newValue as Set<String>, enabledLanguages.values)
             true
         }
 
-        languageFilter.setOnPreferenceChangeListener { _, newValue ->
+        enabledLanguages.setOnPreferenceChangeListener { _, newValue ->
             @Suppress("unchecked_cast")
             updateRepoList(screen, enabledRepos.values, newValue as Set<String>)
             true
         }
 
         // initial load of extensions lists
-        updateRepoList(screen, enabledRepos.values, languageFilter.values)
+        updateRepoList(screen, enabledRepos.values, enabledLanguages.values)
     }
 
     /** Parses provided text as list of repo URLs separated by new lines */
@@ -161,7 +196,7 @@ class ShosetsuSettings :
         .filter { it.isNotEmpty() }
         .toSet()
 
-    private fun updateRepoList(screen: PreferenceScreen, repoSet: Set<String> = emptySet(), languageSet: Set<String> = emptySet()) {
+    private fun updateRepoList(screen: PreferenceScreen, repoSet: Set<String> = emptySet(), languageSet: Set<String> = emptySet(), searchQuery: String = "") {
         val context = screen.context
 
         val toRemove = (0 until screen.getPreferenceCount())
@@ -190,7 +225,10 @@ class ShosetsuSettings :
                 try {
                     val repo = RepositoryManager.getRepo(repoUrl)
                     val extensions = repo.extensions.map { ShosetsuExtension.fromRemote(it, repoUrl) }
-                    val filteredExtensions = extensions.filter { it.lang in languageSet }
+                    val filteredExtensions = extensions.filter { extension ->
+                        (searchQuery.isEmpty() || extension.name.contains(searchQuery, ignoreCase = true)) &&
+                            (languageSet.isEmpty() || extension.lang in languageSet)
+                    }
 
                     runOnMain {
                         category.removeAll()

@@ -22,7 +22,6 @@ object RepositoryManager {
     }
 
     fun getRepo(url: String): RepoIndex {
-        Log.d("Shosetsu", "Getting repository: $url")
         RepoCache.get(url)?.let { return it }
         Log.d("Shosetsu", "Fetching remote repository: $url")
         val response = URL(URL(url.trimEnd('/') + "/"), "index.json").readText()
