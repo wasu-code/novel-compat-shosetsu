@@ -65,7 +65,7 @@ class ShosetsuSettings :
 
     override fun setupPreferenceScreen(screen: PreferenceScreen) {
         // remove prefs added by host app, we don't need them for this dummy source
-        removeAllPreferences(screen)
+        screen.removeAll()
 
         Preference::class.java
             .getConstructor(Context::class.java)
@@ -164,10 +164,10 @@ class ShosetsuSettings :
     private fun updateRepoList(screen: PreferenceScreen, repoSet: Set<String> = emptySet(), languageSet: Set<String> = emptySet()) {
         val context = screen.context
 
-        val toRemove = (0 until getPreferenceCount(screen))
-            .mapNotNull { getPreference(screen, it) }
+        val toRemove = (0 until screen.getPreferenceCount())
+            .mapNotNull { screen.getPreference(it) }
             .filter { it.key?.startsWith("repo_") == true }
-        toRemove.forEach { removePreference(screen, it) }
+        toRemove.forEach { screen.removePreference(it) }
 
         val latch = CountDownLatch(repoSet.size)
 
@@ -377,36 +377,36 @@ class ShosetsuSettings :
         .newInstance(context)
         .apply(block)
 
-    private fun getPreference(screen: PreferenceScreen, index: Int): Preference? = try {
+    private fun PreferenceScreen.getPreference(index: Int): Preference? = try {
         PreferenceScreen::class.java
             .getMethod("getPreference", Int::class.javaPrimitiveType)
-            .invoke(screen, index) as? Preference
+            .invoke(this, index) as? Preference
     } catch (_: Exception) {
         null
     }
 
-    private fun getPreferenceCount(screen: PreferenceScreen): Int = try {
+    private fun PreferenceScreen.getPreferenceCount(): Int = try {
         PreferenceScreen::class.java
             .getMethod("getPreferenceCount")
-            .invoke(screen) as Int
+            .invoke(this) as Int
     } catch (_: Exception) {
         0
     }
 
-    private fun removePreference(screen: PreferenceScreen, pref: Preference) {
+    private fun PreferenceScreen.removePreference(pref: Preference) {
         try {
             PreferenceScreen::class.java
                 .getMethod("removePreference", Preference::class.java)
-                .invoke(screen, pref)
+                .invoke(this, pref)
         } catch (_: Exception) {
         }
     }
 
-    private fun removeAllPreferences(screen: PreferenceScreen) {
+    private fun PreferenceScreen.removeAll() {
         try {
             PreferenceScreen::class.java
                 .getMethod("removeAll")
-                .invoke(screen)
+                .invoke(this)
         } catch (_: Exception) {}
     }
 
