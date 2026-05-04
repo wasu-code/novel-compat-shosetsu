@@ -348,7 +348,7 @@ class ShosetsuExtensionAdapter(private val ext: LuaExtension, language: String) 
                     "Error during loading metadata for this extension: ${e.message}"
                 }
                 setEnabled(false)
-                setIconReflect(android.R.drawable.ic_menu_info_details)
+                setIcon(android.R.drawable.ic_menu_info_details)
             }
             .also(screen::addPreference)
     }

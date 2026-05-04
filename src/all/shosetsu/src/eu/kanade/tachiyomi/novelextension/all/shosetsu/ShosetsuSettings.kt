@@ -73,7 +73,7 @@ class ShosetsuSettings :
             .apply {
                 // TODO: update this summary when host adds support for keeping js/css in Advanced tab
                 summary = "Extensions that rely on injecting scripts/styles may have limited functionality"
-                setIconReflect(android.R.drawable.ic_menu_info_details)
+                setIcon(android.R.drawable.ic_menu_info_details)
             }
             .also(screen::addPreference)
 
@@ -315,7 +315,7 @@ class ShosetsuSettings :
     }
 
     fun Preference.updateExtensionIcon(state: ExtensionState) {
-        this.setIconReflect(
+        this.setIcon(
             when (state) {
                 is ExtensionState.Processing -> android.R.drawable.stat_notify_sync
                 is ExtensionState.Available -> android.R.drawable.presence_invisible

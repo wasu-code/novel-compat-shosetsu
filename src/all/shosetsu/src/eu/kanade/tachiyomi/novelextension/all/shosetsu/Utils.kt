@@ -10,7 +10,7 @@ import java.time.format.DateTimeFormatter
 import java.util.Locale
 import kotlin.jvm.javaClass
 
-fun Preference.setIconReflect(resId: Int): Preference {
+fun Preference.setIcon(resId: Int): Preference {
     try {
         // get the context from Preference via reflection
         val contextField = this.javaClass.getDeclaredField("mContext")
