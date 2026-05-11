@@ -25,6 +25,7 @@ import uy.kohesive.injekt.Injekt
 import uy.kohesive.injekt.api.get
 import java.util.Locale
 import java.util.concurrent.CountDownLatch
+import java.util.concurrent.atomic.AtomicInteger
 
 class ShosetsuSettings :
     Source,
@@ -64,7 +65,16 @@ class ShosetsuSettings :
         }
     }
 
+    private data class ExtensionListFilters(
+        var allRepos: Set<String> = emptySet(),
+        var repos: Set<String> = emptySet(),
+        var query: String = "",
+        var languages: Set<String> = emptySet(),
+    )
+
     override fun setupPreferenceScreen(screen: PreferenceScreen) {
+        val filters = ExtensionListFilters()
+
         // remove prefs added by host app, we don't need them for this dummy source
         screen.removeAll()
 
@@ -124,7 +134,7 @@ class ShosetsuSettings :
             setIcon(android.R.drawable.ic_menu_search)
             setOnPreferenceClickListener {
                 val input = EditText(screen.context).apply {
-                    setText(summary)
+                    setText(filters.query)
                 }
 
                 AlertDialog.Builder(screen.context)
@@ -132,20 +142,26 @@ class ShosetsuSettings :
                     .setMessage("Use global search to search across all languages and repos")
                     .setPositiveButton("Search") { _, _ ->
                         val query = input.text.toString()
-                        // Add search query to standard filters
-                        updateRepoList(screen, enabledRepos.values, enabledLanguages.values, query)
+
+                        filters.query = query
+                        updateExtensionList(screen, filters)
                         summary = query
                     }
                     .setNeutralButton("Global search") { _, _ ->
                         val query = input.text.toString()
-                        val repos = parseRepos(allRepos.text as String)
-                        // Search across all repos, don't filter by language
-                        updateRepoList(screen, repos, searchQuery = query)
+
+                        filters.query = query
+                        // search across all repos and ignore language for this search only
+                        val tempFilters = filters.copy().apply {
+                            this.repos = this.allRepos
+                            this.languages = emptySet()
+                        }
+                        updateExtensionList(screen, tempFilters)
                         summary = query
                     }
                     .setNegativeButton("Clear") { _, _ ->
-                        // Apply standard filters
-                        updateRepoList(screen, enabledRepos.values, enabledLanguages.values)
+                        filters.query = ""
+                        updateExtensionList(screen, filters)
                         summary = ""
                     }
                     .setView(input)
@@ -155,19 +171,21 @@ class ShosetsuSettings :
         }.also(screen::addPreference)
 
         allRepos.setOnPreferenceChangeListener { _, newValue ->
+            val repos = parseRepos(newValue as String)
+            filters.allRepos = repos
+
             enabledRepos.apply {
-                val repos = parseRepos(newValue as String)
                 entries = repos.map { tryParseRepoName(it) }.toTypedArray()
                 entryValues = repos.toTypedArray()
 
                 // Fix invalid stored values
                 val current = values ?: emptySet()
 
-                @Suppress("unchecked_cast")
                 val valid = current.intersect(repos)
 
                 if (valid != current) {
                     values = valid
+                    filters.repos = valid
                 }
             }
             true
@@ -175,18 +193,25 @@ class ShosetsuSettings :
 
         enabledRepos.setOnPreferenceChangeListener { _, newValue ->
             @Suppress("unchecked_cast")
-            updateRepoList(screen, newValue as Set<String>, enabledLanguages.values)
+            filters.repos = newValue as Set<String>
+            updateExtensionList(screen, filters)
             true
         }
 
         enabledLanguages.setOnPreferenceChangeListener { _, newValue ->
             @Suppress("unchecked_cast")
-            updateRepoList(screen, enabledRepos.values, newValue as Set<String>)
+            filters.languages = newValue as Set<String>
+            updateExtensionList(screen, filters)
             true
         }
 
         // initial load of extensions lists
-        updateRepoList(screen, enabledRepos.values, enabledLanguages.values)
+        filters.apply {
+            this.allRepos = parseRepos(allRepos.text ?: "")
+            this.repos = enabledRepos.values
+            this.languages = enabledLanguages.values
+        }
+        updateExtensionList(screen, filters)
     }
 
     /** Parses provided text as list of repo URLs separated by new lines */
@@ -196,17 +221,22 @@ class ShosetsuSettings :
         .filter { it.isNotEmpty() }
         .toSet()
 
-    private fun updateRepoList(screen: PreferenceScreen, repoSet: Set<String> = emptySet(), languageSet: Set<String> = emptySet(), searchQuery: String = "") {
+    private val requestGeneration = AtomicInteger(0)
+    private fun updateExtensionList(screen: PreferenceScreen, filters: ExtensionListFilters) {
         val context = screen.context
+        val current = filters.copy()
+
+        // Every new update invalidates previous requests
+        val generation = requestGeneration.incrementAndGet()
 
         val toRemove = (0 until screen.getPreferenceCount())
             .mapNotNull { screen.getPreference(it) }
             .filter { it.key?.startsWith("repo_") == true }
         toRemove.forEach { screen.removePreference(it) }
 
-        val latch = CountDownLatch(repoSet.size)
+        val latch = CountDownLatch(current.repos.size)
 
-        repoSet.forEachIndexed { index, repoUrl ->
+        current.repos.forEachIndexed { index, repoUrl ->
             val category = PreferenceCategory(context).apply {
                 key = "repo_$index"
                 title = tryParseRepoName(repoUrl)
@@ -226,11 +256,13 @@ class ShosetsuSettings :
                     val repo = RepositoryManager.getRepo(repoUrl)
                     val extensions = repo.extensions.map { ShosetsuExtension.fromRemote(it, repoUrl) }
                     val filteredExtensions = extensions.filter { extension ->
-                        (searchQuery.isEmpty() || extension.name.contains(searchQuery, ignoreCase = true)) &&
-                            (languageSet.isEmpty() || extension.lang in languageSet)
+                        (current.query.isBlank() || extension.name.contains(current.query, ignoreCase = true)) &&
+                            (current.languages.isEmpty() || extension.lang in current.languages)
                     }
 
                     runOnMain {
+                        if (generation != requestGeneration.get()) return@runOnMain
+
                         category.removeAll()
                         if (filteredExtensions.isEmpty()) {
                             category.addPreference(
@@ -256,6 +288,8 @@ class ShosetsuSettings :
                 } catch (e: Exception) {
                     Log.e("ShosetsuSettings", "Failed to load $repoUrl", e)
                     runOnMain {
+                        if (generation != requestGeneration.get()) return@runOnMain
+
                         category.removeAll()
                         category.addPreference(
                             newPreference(context) {
@@ -275,6 +309,8 @@ class ShosetsuSettings :
             latch.await()
 
             runOnMain {
+                if (generation != requestGeneration.get()) return@runOnMain
+
                 val orphanedExtensions = ExtensionRegistry.orphaned()
                 if (orphanedExtensions.isNotEmpty()) {
                     val orphanedCategory = PreferenceCategory(context).apply {
