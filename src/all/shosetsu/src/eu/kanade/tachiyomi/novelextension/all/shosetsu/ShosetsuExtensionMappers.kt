@@ -41,7 +41,7 @@ fun Novel.Chapter.toSChapter(lang: String = "all"): SChapter = SChapter.create()
     if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
         parseSmartDateToMillis(release, lang)?.let { date_upload = it }
     }
-    chapter_number = order.toFloat()
+    chapter_number = order.toFloat().takeIf { it != 0f } ?: -1f // 0 is shosetsu default, -1 means try to guess the chapter number
 }
 
 class TextFilter(name: String, state: String) : Filter.Text(name, state)
