@@ -82,9 +82,22 @@ class ShosetsuSettings :
             .getConstructor(Context::class.java)
             .newInstance(screen.context)
             .apply {
-                // TODO: update this summary when host adds support for keeping js/css in Advanced tab
-                summary = "Extensions that rely on injecting scripts/styles may have limited functionality"
+                summary = """Extensions that rely on injecting scripts/styles may require enabling "Enable embedded CSS" and "Enable embedded JS" in reader settings for full compatibility"""
                 setIcon(android.R.drawable.ic_menu_info_details)
+                setOnPreferenceClickListener {
+                    AlertDialog.Builder(screen.context)
+                        .setMessage(
+                            """
+                            1. Open any chapter.
+                            2. Click on ⚙️ icon on the bottom bar.
+                            3. Navigate to the last tab.
+                            4. Enable "☑️ Enable embedded CSS"
+                                and       "☑️ Enable embedded JS"
+                            """.trimIndent(),
+                        )
+                        .show()
+                    false
+                }
             }
             .also(screen::addPreference)
 
