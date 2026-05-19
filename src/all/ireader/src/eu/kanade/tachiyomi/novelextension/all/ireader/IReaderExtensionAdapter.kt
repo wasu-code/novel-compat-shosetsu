@@ -79,6 +79,10 @@ class HttpSourceAdapter(
 
     override val baseUrl: String = ext.baseUrl
 
+    override fun getMangaUrl(manga: SManga): String = manga.url
+
+    override fun getChapterUrl(chapter: SChapter): String = chapter.url
+
     override fun fetchPopularManga(page: Int): Observable<MangasPage> = c.fetchPopularManga(page)
     override fun popularMangaRequest(page: Int): Request = throw Exception("I expected it not to be used")
     override fun popularMangaParse(response: Response): MangasPage = throw Exception("I expected it not to be used")
