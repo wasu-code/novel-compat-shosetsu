@@ -12,7 +12,6 @@ import ireader.core.source.ParsedHttpSource
 import ireader.core.source.model.PageUrl
 import ireader.core.source.model.Text
 import kotlinx.coroutines.runBlocking
-import kuchihige.utils.log
 import okhttp3.Request
 import okhttp3.Response
 import rx.Observable
@@ -60,7 +59,9 @@ open class CatalogueSourceAdapter(private val ext: IReaderCatalogueSource) : Cat
 
     override fun fetchPageList(chapter: SChapter): Observable<List<Page>> = runBlocking {
         val pages = ext.getPageList(chapter.toChapterInfo(), emptyList())
-        Observable.just(pages.map { it.toPage() })
+//        Observable.just(pages.map { it.toPage() })
+        val chapterContent = pages.map { it.toPage() }.joinToString("") { "<p>" + it.url + "</p>" }
+        Observable.just(listOf(Page(index = 0, url = chapterContent)))
     }
 }
 
@@ -102,7 +103,7 @@ class HttpSourceAdapter(
     override fun imageUrlParse(response: Response): String = throw Exception("I expected it not to be used")
 
     override suspend fun fetchPageText(page: Page): String = when (ext) {
-        is ParsedHttpSource -> page.url.log()
+        is ParsedHttpSource -> "<p>" + page.url + "</p>"
         else -> (ext.getPage(PageUrl(page.url)) as Text).text
     }
 }
