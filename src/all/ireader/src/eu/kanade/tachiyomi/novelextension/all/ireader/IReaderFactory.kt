@@ -15,7 +15,6 @@ import ireader.core.http.WebViewCookieJar
 import ireader.core.http.WebViewManger
 import ireader.core.prefs.Preference
 import ireader.core.prefs.PreferenceStore
-import ireader.core.source.CatalogSource
 import ireader.core.source.TestSource
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -27,6 +26,8 @@ import kotlinx.serialization.json.Json
 import kotlinx.serialization.modules.SerializersModule
 import uy.kohesive.injekt.Injekt
 import uy.kohesive.injekt.api.get
+import ireader.core.source.CatalogSource as IReaderCatalogueSource
+import ireader.core.source.HttpSource as IReaderHttpSource
 
 class IReaderFactory : SourceFactory {
     private val hostContext by lazy { Injekt.get<Application>() }
@@ -64,8 +65,19 @@ class IReaderFactory : SourceFactory {
         }
 
         return buildList {
-            IReaderExtensionAdapter(TestSource()).also(::add)
-            list.map { IReaderExtensionAdapter(it.source as CatalogSource) }.also(::addAll)
+            CatalogueSourceAdapter(TestSource()).also(::add)
+            list.forEach { item ->
+                when (val source = item.source) {
+                    is IReaderHttpSource ->
+                        add(HttpSourceAdapter(source))
+
+                    is IReaderCatalogueSource ->
+                        add(CatalogueSourceAdapter(source))
+
+                    else ->
+                        error("Unknown source type")
+                }
+            }
         }
     }
 }

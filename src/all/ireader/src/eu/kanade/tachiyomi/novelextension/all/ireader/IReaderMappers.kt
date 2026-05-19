@@ -9,7 +9,7 @@ import eu.kanade.tachiyomi.source.model.SManga
 import ireader.core.source.model.ChapterInfo
 import ireader.core.source.model.MangaInfo
 import ireader.core.source.model.MangasPageInfo
-import ireader.core.source.model.PageUrl
+import ireader.core.source.model.Text
 import ireader.core.source.model.Filter as IReaderFilter
 import ireader.core.source.model.FilterList as IReaderFilterList
 import ireader.core.source.model.Page as IReaderPage
@@ -132,5 +132,5 @@ fun SChapter.toChapterInfo() = ChapterInfo(
 
 fun IReaderPage.toPage() = Page(
     index = 0, // this is ignored anyway iirc. I hope
-    url = (this@toPage as PageUrl).url,
+    url = (this@toPage as Text).text,
 )
