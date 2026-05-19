@@ -30,7 +30,10 @@ class IReaderExtensionAdapter(private val ext: IReaderCatalogueSource) : Catalog
         page: Int,
         query: String,
         filters: FilterList,
-    ): Observable<MangasPage> = Observable.empty()
+    ): Observable<MangasPage> = runBlocking {
+        val smth = ext.getMangaList(filters.toFilterList(), page)
+        Observable.just(smth.toMangasPage())
+    }
 
     override fun getFilterList(): FilterList = ext.getFilters().toFilterList()
 
