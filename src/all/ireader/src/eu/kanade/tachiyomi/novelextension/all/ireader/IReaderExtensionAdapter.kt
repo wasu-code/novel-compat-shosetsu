@@ -8,9 +8,6 @@ import eu.kanade.tachiyomi.source.model.Page
 import eu.kanade.tachiyomi.source.model.SChapter
 import eu.kanade.tachiyomi.source.model.SManga
 import eu.kanade.tachiyomi.source.online.HttpSource
-import ireader.core.source.ParsedHttpSource
-import ireader.core.source.model.PageUrl
-import ireader.core.source.model.Text
 import kotlinx.coroutines.runBlocking
 import okhttp3.Request
 import okhttp3.Response
@@ -106,8 +103,5 @@ class HttpSourceAdapter(
 
     override fun imageUrlParse(response: Response): String = throw Exception("I expected it not to be used")
 
-    override suspend fun fetchPageText(page: Page): String = when (ext) {
-        is ParsedHttpSource -> "<p>" + page.url + "</p>"
-        else -> (ext.getPage(PageUrl(page.url)) as Text).text
-    }
+    override suspend fun fetchPageText(page: Page): String = "<p>" + page.url + "</p>"
 }
