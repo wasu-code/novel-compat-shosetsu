@@ -99,6 +99,5 @@ class HttpSourceAdapter(
 
     override fun imageUrlParse(response: Response): String = throw Exception("I expected it not to be used")
 
-    //TODO: fix NoSuchMethodException
     override suspend fun fetchPageText(page: Page): String = (ext.getPage(PageUrl(page.url)) as Text).text
 }
