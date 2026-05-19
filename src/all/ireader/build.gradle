@@ -13,12 +13,9 @@ dependencies {
     //noinspection UseTomlInstead
     implementation("io.github.ireaderorg:source-api:1.5.1") {
         exclude group: "com.squareup.okhttp3"
+        exclude group: "com.squareup.okio"
     }
 }
-
-//tasks.matching { it.name.startsWith("spotless") }.configureEach {
-//    enabled = false
-//}
 
 android {
     compileSdk 36

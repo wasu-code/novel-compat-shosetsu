@@ -8,13 +8,20 @@ import eu.kanade.tachiyomi.source.SourceFactory
 import io.ktor.client.plugins.cookies.CookiesStorage
 import io.ktor.http.Cookie
 import io.ktor.http.Url
+import ireader.core.http.BrowserEngine
+import ireader.core.http.HttpClients
+import ireader.core.http.NetworkConfig
+import ireader.core.http.WebViewCookieJar
+import ireader.core.http.WebViewManger
 import ireader.core.prefs.Preference
 import ireader.core.prefs.PreferenceStore
+import ireader.core.source.CatalogSource
 import ireader.core.source.TestSource
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.runBlocking
 import kotlinx.serialization.KSerializer
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.modules.SerializersModule
@@ -37,25 +44,29 @@ class IReaderFactory : SourceFactory {
 
     override fun createSources(): List<Source> {
         // TODO: handle source factories as well
-//        val list = runBlocking {
-//            AndroidCatalogLoader(hostContext, HttpClients(
-//                context = hostContext,
-//                browseEngine = BrowserEngine(),
-//                cookiesStorage = DummyCookiesStorage(),
-//                webViewCookieJar = WebViewCookieJar(
-//                    cookiesStorage = DummyCookiesStorage()
-//                ),
-//                preferencesStore = DummyPreferenceStore(),
-//                webViewManager = WebViewManger(
-//                    context = hostContext
-//                ),
-//                networkConfig = NetworkConfig(),
-//            )).loadAll()
-//        }
+        val list = runBlocking {
+            AndroidCatalogLoader(
+                hostContext,
+                HttpClients(
+                    context = hostContext,
+                    browseEngine = BrowserEngine(),
+                    cookiesStorage = DummyCookiesStorage(),
+                    webViewCookieJar = WebViewCookieJar(
+                        cookiesStorage = DummyCookiesStorage(),
+                    ),
+                    preferencesStore = DummyPreferenceStore(),
+                    webViewManager = WebViewManger(
+                        context = hostContext,
+                    ),
+                    networkConfig = NetworkConfig(),
+                ),
+            ).loadAll()
+        }
 
-        return listOf(
-            IReaderExtensionAdapter(TestSource()),
-        ) // + (list.map{ CatalogueSourceAdapter(it.source as CatalogSource) })
+        return buildList {
+            IReaderExtensionAdapter(TestSource()).also(::add)
+            list.map { IReaderExtensionAdapter(it.source as CatalogSource) }.also(::addAll)
+        }
     }
 }
 
