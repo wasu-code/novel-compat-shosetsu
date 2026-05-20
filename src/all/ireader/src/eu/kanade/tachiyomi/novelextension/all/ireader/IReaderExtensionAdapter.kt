@@ -8,6 +8,7 @@ import eu.kanade.tachiyomi.source.model.Page
 import eu.kanade.tachiyomi.source.model.SChapter
 import eu.kanade.tachiyomi.source.model.SManga
 import eu.kanade.tachiyomi.source.online.HttpSource
+import ireader.core.source.model.ChapterInfo
 import kotlinx.coroutines.runBlocking
 import okhttp3.Request
 import okhttp3.Response
@@ -43,13 +44,23 @@ open class CatalogueSourceAdapter(private val ext: IReaderCatalogueSource) : Cat
     override fun getFilterList(): FilterList = ext.getFilters().toFilterList()
 
     override fun fetchChapterList(manga: SManga): Observable<List<SChapter>> = runBlocking {
-        // TODO: if ext.supportsPaginatedChapters() go through all pages
-        val chapters = ext.getChapterList(manga.toMangaInfo(), emptyList())
+        if (!ext.supportsPaginatedChapters()) {
+            val chapters = ext.getChapterList(manga.toMangaInfo(), emptyList())
+            Observable.just(chapters.map { it.toSChapter() })
+        }
+
+        var page = 1
+        val chapters = mutableListOf<ChapterInfo>()
+        do {
+            val info = ext.getChapterListPaged(manga.toMangaInfo(), page, emptyList())
+            chapters.addAll(info.chapters)
+            page++
+        } while (!info.hasNextPage)
+
         Observable.just(chapters.map { it.toSChapter() })
     }
 
     override fun fetchMangaDetails(manga: SManga): Observable<SManga> = runBlocking {
-        // TODO: if ext.supportsPaginatedChapters() go through all pages
         val details = ext.getMangaDetails(manga.toMangaInfo(), emptyList())
         Observable.just(details.toSManga())
     }
