@@ -74,7 +74,7 @@ open class CatalogueSourceAdapter(private val ext: IReaderCatalogueSource) : Cat
 }
 
 class HttpSourceAdapter(
-    private val ext: IReaderHttpSource,
+    ext: IReaderHttpSource,
 ) : HttpSource(),
     NovelSource {
 

@@ -6,7 +6,6 @@ import android.content.pm.PackageInfo
 import android.content.pm.PackageManager
 import dalvik.system.PathClassLoader
 import ireader.core.http.HttpClients
-import ireader.core.log.Log
 import ireader.core.source.Dependencies
 import ireader.core.source.Source
 import kotlinx.coroutines.CoroutineScope
@@ -65,45 +64,11 @@ private fun String.toOkioPath(): Path = this.toPath()
  * Class that handles the loading of the catalogs installed in the system and the app.
  */
 class AndroidCatalogLoader(
-    private val context: Context,
+    context: Context,
     private val httpClients: HttpClients,
-//    val simpleStorage: GetSimpleStorage,
 ) {
 
     private val pkgManager = context.packageManager
-
-    // Create secure directories for extension loading
-    private val secureExtensionsDir = File(context.codeCacheDir, "secure_extensions").apply { mkdirs() }
-    private val secureDexCacheDir = File(context.codeCacheDir, "dex-cache").apply { mkdirs() }
-
-    init {
-        // Initialize secure directories at startup
-        createSecureDirectories()
-    }
-
-    /**
-     * Creates secure directories for extension loading
-     */
-    private fun createSecureDirectories() {
-        try {
-            // Ensure secure directories exist
-            secureExtensionsDir.mkdirs()
-            secureDexCacheDir.mkdirs()
-
-            // Clean any stale extension files
-            secureExtensionsDir.listFiles()?.forEach { file ->
-                if (file.isFile && file.name.endsWith(".apk")) {
-                    try {
-                        file.delete()
-                    } catch (_: Exception) {
-                        // Ignore errors
-                    }
-                }
-            }
-        } catch (_: Exception) {
-            // Ignore errors
-        }
-    }
 
     /**
      * Return a list of all the installed catalogs initialized concurrently.
@@ -233,45 +198,6 @@ class AndroidCatalogLoader(
         val classToLoad: String,
         val dependencies: Dependencies,
     )
-
-    /**
-     * Clear the cached DEX/class data for a specific catalog.
-     * This clears both the secure APK copy and the compiled DEX cache,
-     * ensuring the next load will use the fresh APK file.
-     *
-     * @param pkgName The package name of the catalog to clear cache for
-     */
-    fun clearCatalogCache(pkgName: String) {
-        try {
-            Log.info("AndroidCatalogLoader: Clearing cache for $pkgName")
-
-            // Clear the secure APK copy
-            val secureApkFile = File(secureExtensionsDir, "$pkgName.apk")
-            if (secureApkFile.exists()) {
-                secureApkFile.delete()
-                Log.debug { "AndroidCatalogLoader: Deleted secure APK: ${secureApkFile.absolutePath}" }
-            }
-
-            // Clear the DEX cache directory for this package
-            val dexCacheDir = File(secureDexCacheDir, pkgName)
-            if (dexCacheDir.exists() && dexCacheDir.isDirectory) {
-                dexCacheDir.deleteRecursively()
-                Log.debug { "AndroidCatalogLoader: Deleted DEX cache: ${dexCacheDir.absolutePath}" }
-            }
-
-            // Also clear any .dex files that might be directly in the cache dir
-            secureDexCacheDir.listFiles()?.filter {
-                it.name.startsWith(pkgName) && it.name.endsWith(".dex")
-            }?.forEach {
-                it.delete()
-                Log.debug { "AndroidCatalogLoader: Deleted DEX file: ${it.absolutePath}" }
-            }
-
-            Log.info("AndroidCatalogLoader: Cache cleared for $pkgName")
-        } catch (e: Exception) {
-            Log.error("AndroidCatalogLoader: Failed to clear cache for $pkgName", e)
-        }
-    }
 
     private companion object {
         const val EXTENSION_FEATURE = "ireader"
