@@ -121,7 +121,7 @@ class AndroidCatalogLoader(
     }
 
     /**
-     * Returns true if the given package is an catalog.
+     * Returns true if the given package is a catalog.
      *
      * @param pkgInfo The package info of the application.
      */
@@ -199,7 +199,7 @@ class AndroidCatalogLoader(
         val dependencies: Dependencies,
     )
 
-    private companion object {
+    companion object {
         const val EXTENSION_FEATURE = "ireader"
         const val METADATA_SOURCE_CLASS = "source.class"
         const val METADATA_DESCRIPTION = "source.description"

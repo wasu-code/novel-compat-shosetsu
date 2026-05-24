@@ -3,9 +3,8 @@ package eu.kanade.tachiyomi.novelextension.all.ireader
 import android.app.AlertDialog
 import android.app.Application
 import android.content.Context
-import android.content.Intent
+import android.os.Build
 import android.util.Log
-import androidx.core.net.toUri
 import androidx.preference.EditTextPreference
 import androidx.preference.MultiSelectListPreference
 import androidx.preference.Preference
@@ -26,6 +25,7 @@ import kuchihige.utils.newPreference
 import kuchihige.utils.removeAll
 import kuchihige.utils.removePreference
 import kuchihige.utils.runOnMain
+import kuchihige.utils.setIcon
 import rx.Observable
 import uy.kohesive.injekt.Injekt
 import uy.kohesive.injekt.api.get
@@ -47,20 +47,6 @@ class IReaderSettings :
     override fun toString(): String = "Settings"
 
     private val hostContext by lazy { Injekt.get<Application>() }
-
-    /**
-     * Prompt host app to reload all extensions.
-     * That will make newly installed Shosetsu extensions appear in the host app without app restart.
-     */
-    fun reloadExtensions() {
-        val applicationId = hostContext.packageName // theoretically should be BuildConfig.APPLICATION_ID of host app
-        val extensionPackageName = this::class.java.`package`?.name
-        Intent("$applicationId.ACTION_EXTENSION_REPLACED").apply {
-            data = "package:$extensionPackageName".toUri()
-            `package` = hostContext.packageName
-            hostContext.sendBroadcast(this)
-        }
-    }
 
     private data class ExtensionListFilters(
         var allRepos: Set<String> = emptySet(),
@@ -183,12 +169,13 @@ class IReaderSettings :
                                 },
                             )
                         } else {
-                            filteredExtensions.sortedWith(
-                                compareByDescending<RepoExtension> { it.hasUpdate }
-                                    .thenByDescending { it.isInstalled }
-                                    .thenBy { it.name },
-                            ).forEach { ext ->
-                                category.addPreference(createExtensionPreference(context, ext))
+                            // .sortedWith(
+                            //                                compareByDescending<RepoExtension> { it.hasUpdate }
+                            //                                    .thenByDescending { it.isInstalled }
+                            //                                    .thenBy { it.name },
+                            //                            )
+                            filteredExtensions.forEach { ext ->
+                                category.addPreference(createExtensionPreference(context, ext, repoUrl))
                             }
                         }
                     }
@@ -238,12 +225,31 @@ class IReaderSettings :
     private fun createExtensionPreference(
         context: Context,
         ext: RepoExtension,
+        repoUrl: String,
     ): Preference = newPreference(context) {
         title = ext.name
+        val info = runCatching {
+            hostContext.packageManager.getPackageInfo(ext.packageName, 0)
+        }.getOrNull()
+        val installedVersionCode: Long? = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
+            info?.longVersionCode
+        } else {
+            @Suppress("Deprecation")
+            info?.versionCode?.toLong()
+        }
+        val isInstalled = info != null
+        val hasUpdate = isInstalled && (ext.code > (installedVersionCode ?: -1))
         summary = """
-            blah blah
+            ${ext.description}
+            ${ext.version} ${"🔺 ${info?.versionName}".takeIf { hasUpdate} ?: ""}
         """.trimIndent()
-//        updateExtensionIcon(ext.getState())
+        updateExtensionIcon(
+            if (installedVersionCode != null) {
+                ExtensionState.Installed
+            } else {
+                ExtensionState.Available
+            },
+        )
 
         setOnPreferenceClickListener {
             val items = arrayOf(
@@ -256,16 +262,29 @@ class IReaderSettings :
                 .setIcon(android.R.drawable.ic_dialog_dialer)
                 .setItems(items) { _, which ->
                     setEnabled(false)
-//                    updateExtensionIcon(eu.kanade.tachiyomi.novelextension.all.shosetsu.ExtensionState.Processing)
+                    updateExtensionIcon(ExtensionState.Processing)
 
                     when (which) {
-                        0 -> installExtension(ext)
+                        0 -> installExtension(ext, repoUrl)
                         1 -> uninstallExtension(ext)
                     }
                 }
                 .show()
             true
         }
+    }
+
+    fun Preference.updateExtensionIcon(state: ExtensionState) {
+        this.setIcon(
+            when (state) {
+                is ExtensionState.Processing -> android.R.drawable.stat_notify_sync
+                is ExtensionState.Available -> android.R.drawable.presence_invisible
+                is ExtensionState.Installed -> android.R.drawable.presence_online
+                is ExtensionState.UpdatePending -> android.R.drawable.presence_away
+                is ExtensionState.Orphaned -> android.R.drawable.presence_busy
+                is ExtensionState.OperationFailed -> android.R.drawable.ic_popup_disk_full
+            },
+        )
     }
 
     /** Parses provided text as list of repo URLs separated by new lines */

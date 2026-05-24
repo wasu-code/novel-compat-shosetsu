@@ -31,10 +31,7 @@ data class RepoExtension(
     @SerialName("nsfw")
     val isNSFW: Boolean,
     val sourceDir: String,
-) {
-    val hasUpdate = false // TODO: check with package manager
-    val isInstalled = false
-}
+)
 
 object RepositoryManager {
     private val json = Json {

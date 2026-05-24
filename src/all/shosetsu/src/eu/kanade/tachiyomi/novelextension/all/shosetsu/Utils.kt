@@ -2,13 +2,11 @@ package eu.kanade.tachiyomi.novelextension.all.shosetsu
 
 import android.os.Build
 import androidx.annotation.RequiresApi
-import androidx.preference.Preference
 import app.shosetsu.lib.Version
 import java.time.LocalDate
 import java.time.ZoneOffset
 import java.time.format.DateTimeFormatter
 import java.util.Locale
-import kotlin.jvm.javaClass
 
 fun Version.toVersionString(): String = "$major.$minor.$patch"
 
