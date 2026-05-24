@@ -4,8 +4,6 @@ import android.app.AlertDialog
 import android.app.Application
 import android.content.Context
 import android.content.Intent
-import android.os.Handler
-import android.os.Looper
 import android.util.Log
 import android.widget.EditText
 import androidx.core.net.toUri
@@ -22,9 +20,11 @@ import eu.kanade.tachiyomi.source.model.SChapter
 import eu.kanade.tachiyomi.source.model.SManga
 import kuchihige.utils.getPreference
 import kuchihige.utils.getPreferenceCount
+import kuchihige.utils.launchIO
 import kuchihige.utils.newPreference
 import kuchihige.utils.removeAll
 import kuchihige.utils.removePreference
+import kuchihige.utils.runOnMain
 import rx.Observable
 import uy.kohesive.injekt.Injekt
 import uy.kohesive.injekt.api.get
@@ -45,16 +45,7 @@ class ShosetsuSettings :
     // display name
     override fun toString(): String = "Settings"
 
-    private val mainHandler = Handler(Looper.getMainLooper())
     private val hostContext by lazy { Injekt.get<Application>() }
-
-    private fun launchIO(block: () -> Unit) {
-        Thread(block).start()
-    }
-
-    private fun runOnMain(block: () -> Unit) {
-        mainHandler.post(block)
-    }
 
     /**
      * Prompt host app to reload all extensions.
