@@ -1,0 +1,308 @@
+package eu.kanade.tachiyomi.novelextension.all.ireader
+
+import android.app.AlertDialog
+import android.app.Application
+import android.content.Context
+import android.content.Intent
+import android.util.Log
+import androidx.core.net.toUri
+import androidx.preference.EditTextPreference
+import androidx.preference.MultiSelectListPreference
+import androidx.preference.Preference
+import androidx.preference.PreferenceCategory
+import androidx.preference.PreferenceScreen
+import eu.kanade.tachiyomi.novelextension.all.ireader.ExtensionManager.installExtension
+import eu.kanade.tachiyomi.novelextension.all.ireader.ExtensionManager.uninstallExtension
+import eu.kanade.tachiyomi.source.ConfigurableSource
+import eu.kanade.tachiyomi.source.NovelSource
+import eu.kanade.tachiyomi.source.Source
+import eu.kanade.tachiyomi.source.model.Page
+import eu.kanade.tachiyomi.source.model.SChapter
+import eu.kanade.tachiyomi.source.model.SManga
+import kuchihige.utils.getPreference
+import kuchihige.utils.getPreferenceCount
+import kuchihige.utils.launchIO
+import kuchihige.utils.newPreference
+import kuchihige.utils.removeAll
+import kuchihige.utils.removePreference
+import kuchihige.utils.runOnMain
+import rx.Observable
+import uy.kohesive.injekt.Injekt
+import uy.kohesive.injekt.api.get
+import java.util.concurrent.CountDownLatch
+import java.util.concurrent.atomic.AtomicInteger
+import kotlin.collections.intersect
+
+class IReaderSettings :
+    Source,
+    NovelSource,
+    ConfigurableSource {
+    override val id: Long = 738210197100101114
+    val lang: String = "all"
+
+    // `!` character to pin it to the top of the list
+    override val name: String = "! IReader Settings"
+
+    // display name
+    override fun toString(): String = "Settings"
+
+    private val hostContext by lazy { Injekt.get<Application>() }
+
+    /**
+     * Prompt host app to reload all extensions.
+     * That will make newly installed Shosetsu extensions appear in the host app without app restart.
+     */
+    fun reloadExtensions() {
+        val applicationId = hostContext.packageName // theoretically should be BuildConfig.APPLICATION_ID of host app
+        val extensionPackageName = this::class.java.`package`?.name
+        Intent("$applicationId.ACTION_EXTENSION_REPLACED").apply {
+            data = "package:$extensionPackageName".toUri()
+            `package` = hostContext.packageName
+            hostContext.sendBroadcast(this)
+        }
+    }
+
+    private data class ExtensionListFilters(
+        var allRepos: Set<String> = emptySet(),
+        var repos: Set<String> = emptySet(),
+        var query: String = "",
+        var languages: Set<String> = emptySet(),
+    )
+
+    override fun setupPreferenceScreen(screen: PreferenceScreen) {
+        val filters = ExtensionListFilters()
+
+        // remove prefs added by host app, we don't need them for this dummy source
+        screen.removeAll()
+
+        val allRepos = EditTextPreference(screen.context).apply {
+            key = "REPOS"
+            title = "Repositories"
+            summary = "Add URLs of repositories providing Shosetsu extensions"
+            dialogTitle = "Repositories URLs"
+            dialogMessage = "One per line"
+        }.also(screen::addPreference)
+
+        val filterCategory = PreferenceCategory(screen.context).apply {
+            summary = "Limit the amount of extensions on the list"
+        }.also(screen::addPreference)
+
+        val enabledRepos = MultiSelectListPreference(screen.context).apply {
+            key = "ENABLED_REPOS"
+            title = "Select repositories"
+            summary = "Enable/disable repositories to display extensions (and load libraries) from"
+            val repos = parseRepos(allRepos.text ?: "")
+            entries = repos.map { tryParseRepoName(it) }.toTypedArray()
+            entryValues = repos.toTypedArray()
+            values = values.intersect(repos)
+            setDefaultValue(repos)
+        }.also(filterCategory::addPreference)
+
+        allRepos.setOnPreferenceChangeListener { _, newValue ->
+            val repos = parseRepos(newValue as String)
+            filters.allRepos = repos
+
+            enabledRepos.apply {
+                entries = repos.map { tryParseRepoName(it) }.toTypedArray()
+                entryValues = repos.toTypedArray()
+
+                // Fix invalid stored values
+                val current = values ?: emptySet()
+
+                val valid = current.intersect(repos)
+
+                if (valid != current) {
+                    values = valid
+                    filters.repos = valid
+                }
+            }
+            true
+        }
+
+        enabledRepos.setOnPreferenceChangeListener { _, newValue ->
+            @Suppress("unchecked_cast")
+            filters.repos = newValue as Set<String>
+            updateExtensionList(screen, filters)
+            true
+        }
+
+        // initial load of extensions lists
+        filters.apply {
+            this.allRepos = parseRepos(allRepos.text ?: "")
+            this.repos = enabledRepos.values
+        }
+        updateExtensionList(screen, filters)
+    }
+
+    private val requestGeneration = AtomicInteger(0)
+    private fun updateExtensionList(screen: PreferenceScreen, filters: ExtensionListFilters) {
+        val context = screen.context
+        val current = filters.copy()
+
+        // Every new update invalidates previous requests
+        val generation = requestGeneration.incrementAndGet()
+
+        val toRemove = (0 until screen.getPreferenceCount())
+            .mapNotNull { screen.getPreference(it) }
+            .filter { it.key?.startsWith("repo_") == true }
+        toRemove.forEach { screen.removePreference(it) }
+
+        val latch = CountDownLatch(current.repos.size)
+
+        current.repos.forEachIndexed { index, repoUrl ->
+            val category = PreferenceCategory(context).apply {
+                key = "repo_$index"
+                title = tryParseRepoName(repoUrl)
+                summary = repoUrl
+                initialExpandedChildrenCount = 3
+            }.also(screen::addPreference)
+
+            category.addPreference(
+                newPreference(context) {
+                    title = "Loading…"
+                    setEnabled(false)
+                },
+            )
+
+            launchIO {
+                try {
+                    val extensions = RepositoryManager.getRepo(repoUrl)
+                    val filteredExtensions = extensions.filter { extension ->
+                        (current.query.isBlank() || extension.name.contains(current.query, ignoreCase = true))
+                    }
+
+                    runOnMain {
+                        if (generation != requestGeneration.get()) return@runOnMain
+
+                        category.removeAll()
+                        if (filteredExtensions.isEmpty()) {
+                            category.addPreference(
+                                newPreference(context) {
+                                    title = if (extensions.isEmpty()) "No extensions found" else "No extensions match selected filters"
+                                    setEnabled(false)
+                                },
+                            )
+                        } else {
+                            filteredExtensions.sortedWith(
+                                compareByDescending<RepoExtension> { it.hasUpdate }
+                                    .thenByDescending { it.isInstalled }
+                                    .thenBy { it.name },
+                            ).forEach { ext ->
+                                category.addPreference(createExtensionPreference(context, ext))
+                            }
+                        }
+                    }
+                } catch (e: Exception) {
+                    Log.e("ShosetsuSettings", "Failed to load $repoUrl", e)
+                    runOnMain {
+                        if (generation != requestGeneration.get()) return@runOnMain
+
+                        category.removeAll()
+                        category.addPreference(
+                            newPreference(context) {
+                                title = "Failed to load"
+                                summary = e.message
+                                setEnabled(false)
+                            },
+                        )
+                    }
+                } finally {
+                    latch.countDown()
+                }
+            }
+        }
+
+        launchIO {
+            latch.await()
+
+            runOnMain {
+                if (generation != requestGeneration.get()) return@runOnMain
+
+//                val orphanedExtensions = ExtensionRegistry.orphaned()
+//                if (orphanedExtensions.isNotEmpty()) {
+//                    val orphanedCategory = PreferenceCategory(context).apply {
+//                        key = "repo_unknown"
+//                        title = "Orphaned extensions"
+//                        summary = "Enable all repos to determine which are truly obsolete."
+//                        initialExpandedChildrenCount = 3
+//                    }.also(screen::addPreference)
+//
+//                    orphanedExtensions.forEach { ext ->
+//                        orphanedCategory.addPreference(createExtensionPreference(context, ext))
+//                    }
+//                }
+            }
+        }
+    }
+
+    private fun createExtensionPreference(
+        context: Context,
+        ext: RepoExtension,
+    ): Preference = newPreference(context) {
+        title = ext.name
+        summary = """
+            blah blah
+        """.trimIndent()
+//        updateExtensionIcon(ext.getState())
+
+        setOnPreferenceClickListener {
+            val items = arrayOf(
+                "Install/Update",
+                "Uninstall",
+            )
+
+            AlertDialog.Builder(context)
+                .setTitle("Manage Extension")
+                .setIcon(android.R.drawable.ic_dialog_dialer)
+                .setItems(items) { _, which ->
+                    setEnabled(false)
+//                    updateExtensionIcon(eu.kanade.tachiyomi.novelextension.all.shosetsu.ExtensionState.Processing)
+
+                    when (which) {
+                        0 -> installExtension(ext)
+                        1 -> uninstallExtension(ext)
+                    }
+                }
+                .show()
+            true
+        }
+    }
+
+    /** Parses provided text as list of repo URLs separated by new lines */
+    private fun parseRepos(text: String): Set<String> = text
+        .split("\n")
+        .map { it.trim().trimEnd('/') }
+        .filter { it.isNotEmpty() }
+        .toSet()
+
+    fun tryParseRepoName(repoUrl: String): String = try {
+        val cleaned = repoUrl
+            .removePrefix("https://")
+            .removePrefix("http://")
+            .removePrefix("www.")
+            .trim('/')
+
+        val path = cleaned.substringAfter('/', "")
+        val parts = path.split("/").filter { it.isNotBlank() }
+
+        when {
+            // <domain>/<owner>/<repo> (GitHub, Gitlab)
+            (
+                cleaned.startsWith("raw.githubusercontent.com") ||
+                    cleaned.startsWith("gitlab.com")
+                ) &&
+                parts.size >= 2
+            -> "${parts[1].replaceFirstChar { it.uppercase() }} by ${parts[0]}"
+
+            else -> repoUrl
+        }
+    } catch (_: Exception) {
+        repoUrl
+    }
+//  === Unused ================================================================
+
+    override fun fetchChapterList(manga: SManga): Observable<List<SChapter>> = throw UnsupportedOperationException("Not used")
+    override fun fetchMangaDetails(manga: SManga): Observable<SManga> = throw UnsupportedOperationException("Not used")
+    override fun fetchPageList(chapter: SChapter): Observable<List<Page>> = throw UnsupportedOperationException("Not used")
+    override suspend fun fetchPageText(page: Page): String = throw UnsupportedOperationException("Not used")
+}

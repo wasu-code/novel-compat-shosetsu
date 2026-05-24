@@ -15,7 +15,6 @@ import ireader.core.http.WebViewCookieJar
 import ireader.core.http.WebViewManger
 import ireader.core.prefs.Preference
 import ireader.core.prefs.PreferenceStore
-import ireader.core.source.TestSource
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -33,19 +32,8 @@ class IReaderFactory : SourceFactory {
     private val hostContext by lazy { Injekt.get<Application>() }
     private val nh = Injekt.get<NetworkHelper>()
 
-    class DummyCookiesStorage : CookiesStorage {
-        override suspend fun get(requestUrl: Url): List<Cookie> = emptyList()
-
-        override suspend fun addCookie(requestUrl: Url, cookie: Cookie) {
-        }
-
-        override fun close() {
-        }
-    }
-
     override fun createSources(): List<Source> {
-        // TODO: handle source factories as well
-        val list = runBlocking {
+        val extensions = runBlocking {
             AndroidCatalogLoader(
                 hostContext,
                 HttpClients(
@@ -65,8 +53,9 @@ class IReaderFactory : SourceFactory {
         }
 
         return buildList {
-            CatalogueSourceAdapter(TestSource()).also(::add)
-            list.forEach { item ->
+//            CatalogueSourceAdapter(TestSource()).also(::add)
+            IReaderSettings().also(::add)
+            extensions.forEach { item ->
                 when (val source = item.source) {
                     is IReaderHttpSource ->
                         add(HttpSourceAdapter(source))
@@ -79,6 +68,16 @@ class IReaderFactory : SourceFactory {
                 }
             }
         }
+    }
+}
+
+class DummyCookiesStorage : CookiesStorage {
+    override suspend fun get(requestUrl: Url): List<Cookie> = emptyList()
+
+    override suspend fun addCookie(requestUrl: Url, cookie: Cookie) {
+    }
+
+    override fun close() {
     }
 }
 
