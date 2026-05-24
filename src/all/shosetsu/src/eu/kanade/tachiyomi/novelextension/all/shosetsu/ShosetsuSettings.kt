@@ -20,6 +20,11 @@ import eu.kanade.tachiyomi.source.Source
 import eu.kanade.tachiyomi.source.model.Page
 import eu.kanade.tachiyomi.source.model.SChapter
 import eu.kanade.tachiyomi.source.model.SManga
+import kuchihige.utils.getPreference
+import kuchihige.utils.getPreferenceCount
+import kuchihige.utils.newPreference
+import kuchihige.utils.removeAll
+import kuchihige.utils.removePreference
 import rx.Observable
 import uy.kohesive.injekt.Injekt
 import uy.kohesive.injekt.api.get
@@ -457,45 +462,7 @@ class ShosetsuSettings :
         }
     }
 
-//  === Preference Helpers ====================================================
 
-    private fun newPreference(context: Context, block: Preference.() -> Unit): Preference = Preference::class.java
-        .getConstructor(Context::class.java)
-        .newInstance(context)
-        .apply(block)
-
-    private fun PreferenceScreen.getPreference(index: Int): Preference? = try {
-        PreferenceScreen::class.java
-            .getMethod("getPreference", Int::class.javaPrimitiveType)
-            .invoke(this, index) as? Preference
-    } catch (_: Exception) {
-        null
-    }
-
-    private fun PreferenceScreen.getPreferenceCount(): Int = try {
-        PreferenceScreen::class.java
-            .getMethod("getPreferenceCount")
-            .invoke(this) as Int
-    } catch (_: Exception) {
-        0
-    }
-
-    private fun PreferenceScreen.removePreference(pref: Preference) {
-        try {
-            PreferenceScreen::class.java
-                .getMethod("removePreference", Preference::class.java)
-                .invoke(this, pref)
-        } catch (_: Exception) {
-        }
-    }
-
-    private fun PreferenceScreen.removeAll() {
-        try {
-            PreferenceScreen::class.java
-                .getMethod("removeAll")
-                .invoke(this)
-        } catch (_: Exception) {}
-    }
 
 //  === Unused ================================================================
 
