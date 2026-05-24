@@ -84,6 +84,8 @@ class IReaderSettings :
             setDefaultValue(repos)
         }.also(filterCategory::addPreference)
 
+        // TODO: language and search filters
+
         allRepos.setOnPreferenceChangeListener { _, newValue ->
             val repos = parseRepos(newValue as String)
             filters.allRepos = repos
@@ -205,6 +207,7 @@ class IReaderSettings :
             runOnMain {
                 if (generation != requestGeneration.get()) return@runOnMain
 
+                // TODO: show obsolete plugins
 //                val orphanedExtensions = ExtensionRegistry.orphaned()
 //                if (orphanedExtensions.isNotEmpty()) {
 //                    val orphanedCategory = PreferenceCategory(context).apply {
@@ -240,8 +243,8 @@ class IReaderSettings :
         val isInstalled = info != null
         val hasUpdate = isInstalled && (ext.code > (installedVersionCode ?: -1))
         summary = """
+            ${ext.lang} •  ${ext.version} ${"🔺 ${info?.versionName}".takeIf { hasUpdate } ?: ""}
             ${ext.description}
-            ${ext.version} ${"🔺 ${info?.versionName}".takeIf { hasUpdate} ?: ""}
         """.trimIndent()
         updateExtensionIcon(
             if (installedVersionCode != null) {
@@ -265,8 +268,14 @@ class IReaderSettings :
                     updateExtensionIcon(ExtensionState.Processing)
 
                     when (which) {
-                        0 -> installExtension(ext, repoUrl)
-                        1 -> uninstallExtension(ext)
+                        0 -> installExtension(ext, repoUrl) {
+                            setEnabled(true)
+                            updateExtensionIcon(ExtensionState.Installed)
+                        }
+                        1 -> uninstallExtension(ext) {
+                            setEnabled(true)
+                            updateExtensionIcon(ExtensionState.Available)
+                        }
                     }
                 }
                 .show()

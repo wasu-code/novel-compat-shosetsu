@@ -37,7 +37,6 @@ sealed class ExtensionState {
 
 object ExtensionManager {
     private val hostContext by lazy { Injekt.get<Application>() }
-    private val pendingInstalls = mutableSetOf<String>()
 
     init {
         val receiver = object : BroadcastReceiver() {
@@ -89,7 +88,7 @@ object ExtensionManager {
     }
 
     @SuppressLint("UnspecifiedRegisterReceiverFlag")
-    fun installExtension(ext: RepoExtension, repoUrl: String) {
+    fun installExtension(ext: RepoExtension, repoUrl: String, onInstall: () -> Unit) {
         val apkName = ext.apkName
         val apkUrl = "$repoUrl/apk/$apkName"
 
@@ -125,7 +124,6 @@ object ExtensionManager {
                 if (id != downloadId) return
 
                 try {
-                    pendingInstalls += apkName
                     installApk(context, dm, downloadId)
                 } finally {
                     safeUnregister(this)
@@ -142,9 +140,11 @@ object ExtensionManager {
 
         val installReceiver = object : BroadcastReceiver() {
             override fun onReceive(context: Context, intent: Intent) {
-                if (!pendingInstalls.remove(ext.apkName)) return
+                val packageName = intent.data?.schemeSpecificPart ?: return
+                if (packageName != ext.packageName) return
 
                 cleanupApk(ext)
+                onInstall()
                 safeUnregister(this)
             }
         }
@@ -220,12 +220,30 @@ object ExtensionManager {
         }
     }
 
-    fun uninstallExtension(ext: RepoExtension) {
+    fun uninstallExtension(ext: RepoExtension, onUninstall: () -> Unit) {
         val intent = Intent(Intent.ACTION_DELETE).apply {
             data = "package:${ext.packageName}".toUri()
             addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
         }
 
         hostContext.startActivity(intent)
+
+        val uninstallReceiver = object : BroadcastReceiver() {
+            override fun onReceive(context: Context, intent: Intent) {
+                val packageName = intent.data?.schemeSpecificPart ?: return
+                if (packageName != ext.packageName) return
+
+                onUninstall()
+                safeUnregister(this)
+            }
+        }
+
+        registerReceiverCompat(
+            uninstallReceiver,
+            IntentFilter().apply {
+                addAction(Intent.ACTION_PACKAGE_REMOVED)
+                addDataScheme("package")
+            },
+        )
     }
 }

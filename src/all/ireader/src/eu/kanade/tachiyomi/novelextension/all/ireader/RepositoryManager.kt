@@ -25,6 +25,7 @@ data class RepoExtension(
     val apkName: String,
     val name: String,
     val id: Long,
+    val lang: String,
     val code: Int,
     val version: String,
     val description: String,

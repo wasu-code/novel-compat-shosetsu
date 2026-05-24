@@ -71,6 +71,8 @@ class IReaderFactory : SourceFactory {
     }
 }
 
+// TODO: actual implementations for dummy classes
+
 class DummyCookiesStorage : CookiesStorage {
     override suspend fun get(requestUrl: Url): List<Cookie> = emptyList()
 
