@@ -17,6 +17,7 @@ import eu.kanade.tachiyomi.source.model.Page
 import eu.kanade.tachiyomi.source.model.SChapter
 import keiyoushi.utils.getPreferences
 import kuchihige.source.NovelHttpSource
+import kuchihige.utils.setIcon
 import okhttp3.Request
 import okhttp3.Response
 import rx.Observable

@@ -25,6 +25,7 @@ import kuchihige.utils.newPreference
 import kuchihige.utils.removeAll
 import kuchihige.utils.removePreference
 import kuchihige.utils.runOnMain
+import kuchihige.utils.setIcon
 import rx.Observable
 import uy.kohesive.injekt.Injekt
 import uy.kohesive.injekt.api.get
