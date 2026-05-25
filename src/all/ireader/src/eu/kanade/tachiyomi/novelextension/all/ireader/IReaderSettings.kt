@@ -64,7 +64,7 @@ class IReaderSettings :
         val allRepos = EditTextPreference(screen.context).apply {
             key = "REPOS"
             title = "Repositories"
-            summary = "Add URLs of repositories providing Shosetsu extensions"
+            summary = "Add URLs of repositories providing IReader extensions"
             dialogTitle = "Repositories URLs"
             dialogMessage = "One per line"
         }.also(screen::addPreference)
@@ -76,7 +76,7 @@ class IReaderSettings :
         val enabledRepos = MultiSelectListPreference(screen.context).apply {
             key = "ENABLED_REPOS"
             title = "Select repositories"
-            summary = "Enable/disable repositories to display extensions (and load libraries) from"
+            summary = "Enable/disable repositories to display extensions from"
             val repos = parseRepos(allRepos.text ?: "")
             entries = repos.map { tryParseRepoName(it) }.toTypedArray()
             entryValues = repos.toTypedArray()
