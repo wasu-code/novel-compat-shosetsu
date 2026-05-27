@@ -50,6 +50,8 @@ class IReaderFactory : SourceFactory {
                     networkConfig = NetworkConfig(),
                 ),
             ).loadAll()
+        }.also {
+            ExtensionRegistry.installed.addAll(it.filterIsInstance<CatalogInstalled>())
         }
 
         return buildList {

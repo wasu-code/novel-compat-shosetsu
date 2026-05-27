@@ -13,7 +13,6 @@ import android.os.Environment
 import android.os.Handler
 import android.os.Looper
 import androidx.core.net.toUri
-import kuchihige.utils.log
 import uy.kohesive.injekt.Injekt
 import uy.kohesive.injekt.api.get
 import java.io.File
@@ -36,6 +35,21 @@ sealed class ExtensionState {
 
     /** Operation taken on the extension failed */
     data object OperationFailed : ExtensionState()
+
+    /** Extension was just removed */
+    data object Removed : ExtensionState()
+}
+
+object ExtensionRegistry {
+    /** Holds a list of extensions installed on the system */
+    val installed = mutableListOf<CatalogInstalled>()
+
+    /** Holds a set of packageNames that were seen in remote repositories */
+    val knownPackageNames = mutableSetOf<String>()
+
+    /** List of extensions that are installed but not yet associated with any repo  */
+    val orphaned
+        get() = installed.filter { it.pkgName !in knownPackageNames }
 }
 
 object ExtensionManager {
@@ -44,7 +58,6 @@ object ExtensionManager {
     init {
         val receiver = object : BroadcastReceiver() {
             override fun onReceive(context: Context, intent: Intent) {
-                "received something".log()
                 val packageName =
                     intent.data?.schemeSpecificPart ?: return
 

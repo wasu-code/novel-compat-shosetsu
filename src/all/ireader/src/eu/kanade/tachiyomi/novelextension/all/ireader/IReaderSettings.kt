@@ -222,6 +222,7 @@ class IReaderSettings :
             launchIO {
                 try {
                     val extensions = RepositoryManager.getRepo(repoUrl)
+                    extensions.forEach { ExtensionRegistry.knownPackageNames += it.packageName }
                     val filteredExtensions = extensions.filter { extension ->
                         (current.query.isBlank() || extension.name.contains(current.query, ignoreCase = true)) &&
                             (current.languages.isEmpty() || extension.lang in current.languages)
@@ -275,20 +276,31 @@ class IReaderSettings :
             runOnMain {
                 if (generation != requestGeneration.get()) return@runOnMain
 
-                // TODO: show obsolete plugins
-//                val orphanedExtensions = ExtensionRegistry.orphaned()
-//                if (orphanedExtensions.isNotEmpty()) {
-//                    val orphanedCategory = PreferenceCategory(context).apply {
-//                        key = "repo_unknown"
-//                        title = "Orphaned extensions"
-//                        summary = "Enable all repos to determine which are truly obsolete."
-//                        initialExpandedChildrenCount = 3
-//                    }.also(screen::addPreference)
-//
-//                    orphanedExtensions.forEach { ext ->
-//                        orphanedCategory.addPreference(createExtensionPreference(context, ext))
-//                    }
-//                }
+                val orphanedExtensions = ExtensionRegistry.orphaned
+                if (orphanedExtensions.isNotEmpty()) {
+                    val orphanedCategory = PreferenceCategory(context).apply {
+                        key = "repo_unknown"
+                        title = "Orphaned extensions"
+                        summary = "Enable all repos to determine which are truly obsolete."
+                        initialExpandedChildrenCount = 3
+                    }.also(screen::addPreference)
+
+                    orphanedExtensions.forEach { catalog ->
+                        val fakeExt = RepoExtension(
+                            packageName = catalog.pkgName,
+                            apkName = "",
+                            name = catalog.name,
+                            id = catalog.sourceId,
+                            lang = "",
+                            code = 0,
+                            version = "",
+                            description = "",
+                            isNSFW = false,
+                            sourceDir = "",
+                        )
+                        orphanedCategory.addPreference(createExtensionPreference(context, fakeExt, ""))
+                    }
+                }
             }
         }
     }
@@ -315,10 +327,11 @@ class IReaderSettings :
             ${ext.description}
         """.trimIndent()
         updateExtensionIcon(
-            if (installedVersionCode != null) {
-                ExtensionState.Installed
-            } else {
-                ExtensionState.Available
+            when {
+                repoUrl.isBlank() -> ExtensionState.Orphaned
+                hasUpdate -> ExtensionState.UpdatePending
+                isInstalled -> ExtensionState.Installed
+                else -> ExtensionState.Available
             },
         )
 
@@ -342,7 +355,7 @@ class IReaderSettings :
                         }
                         1 -> uninstallExtension(ext) {
                             setEnabled(true)
-                            updateExtensionIcon(ExtensionState.Available)
+                            updateExtensionIcon(ExtensionState.Removed)
                         }
                     }
                 }
@@ -360,6 +373,7 @@ class IReaderSettings :
                 is ExtensionState.UpdatePending -> android.R.drawable.presence_away
                 is ExtensionState.Orphaned -> android.R.drawable.presence_busy
                 is ExtensionState.OperationFailed -> android.R.drawable.ic_popup_disk_full
+                is ExtensionState.Removed -> android.R.drawable.presence_offline
             },
         )
     }
