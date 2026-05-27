@@ -2,11 +2,12 @@ package eu.kanade.tachiyomi.novelextension.all.ireader
 
 import android.app.Application
 import android.content.SharedPreferences
+import androidx.core.content.edit
 import eu.kanade.tachiyomi.network.NetworkHelper
 import eu.kanade.tachiyomi.source.Source
 import eu.kanade.tachiyomi.source.SourceFactory
 import io.ktor.client.plugins.cookies.CookiesStorage
-import io.ktor.http.Cookie
+import io.ktor.http.CookieEncoding
 import io.ktor.http.Url
 import ireader.core.http.BrowserEngine
 import ireader.core.http.HttpClients
@@ -23,15 +24,21 @@ import kotlinx.coroutines.runBlocking
 import kotlinx.serialization.KSerializer
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.modules.SerializersModule
+import okhttp3.CookieJar
+import okhttp3.HttpUrl.Companion.toHttpUrlOrNull
 import uy.kohesive.injekt.Injekt
 import uy.kohesive.injekt.api.get
+import io.ktor.http.Cookie as KtorCookie
 import ireader.core.source.CatalogSource as IReaderCatalogueSource
 import ireader.core.source.HttpSource as IReaderHttpSource
-import androidx.core.content.edit
+import okhttp3.Cookie as OkHttpCookie
 
 class IReaderFactory : SourceFactory {
     private val hostContext by lazy { Injekt.get<Application>() }
     private val nh = Injekt.get<NetworkHelper>()
+    private val cookiesStorage: CookiesStorage by lazy {
+        OkHttpCookiesStorage(nh.client.cookieJar)
+    }
 
     override fun createSources(): List<Source> {
         val extensions = runBlocking {
@@ -40,11 +47,11 @@ class IReaderFactory : SourceFactory {
                 HttpClients(
                     context = hostContext,
                     browseEngine = BrowserEngine(),
-                    cookiesStorage = DummyCookiesStorage(),
+                    cookiesStorage = cookiesStorage,
                     webViewCookieJar = WebViewCookieJar(
-                        cookiesStorage = DummyCookiesStorage(),
+                        cookiesStorage = cookiesStorage,
                     ),
-                    preferencesStore = DummyPreferenceStore(),
+                    preferencesStore = PreferenceStore(),
                     webViewManager = WebViewManger(
                         context = hostContext,
                     ),
@@ -74,23 +81,78 @@ class IReaderFactory : SourceFactory {
     }
 }
 
-// TODO: actual implementations for dummy classes
+// ============================================================================
 
-class DummyCookiesStorage : CookiesStorage {
-    override suspend fun get(requestUrl: Url): List<Cookie> = emptyList()
+/**
+ * Bridges the host app's OkHttp CookieJar into IReader's ktor-based CookiesStorage.
+ *
+ * IReader extensions call HttpClients for network requests; those go through ktor,
+ * which uses CookiesStorage. By backing it with the host's NetworkHelper CookieJar
+ * we get shared cookie state across both HTTP stacks (e.g. login sessions work).
+ */
+class OkHttpCookiesStorage(
+    private val cookieJar: CookieJar,
+) : CookiesStorage {
 
-    override suspend fun addCookie(requestUrl: Url, cookie: Cookie) {
+    override suspend fun get(requestUrl: Url): List<KtorCookie> {
+        val okHttpUrl = requestUrl.toString().toHttpUrlOrNull() ?: return emptyList()
+        return cookieJar.loadForRequest(okHttpUrl).map { it.toKtorCookie() }
+    }
+
+    override suspend fun addCookie(requestUrl: Url, cookie: KtorCookie) {
+        val okHttpUrl = requestUrl.toString().toHttpUrlOrNull() ?: return
+        val okHttpCookie = cookie.toOkHttpCookie(okHttpUrl) ?: return
+        cookieJar.saveFromResponse(okHttpUrl, listOf(okHttpCookie))
     }
 
     override fun close() {
+        // CookieJar is owned by NetworkHelper; not ours to close
     }
 }
 
-class DummyPreferenceStore : PreferenceStore {
+private fun OkHttpCookie.toKtorCookie(): KtorCookie = KtorCookie(
+    name = name,
+    value = value,
+    domain = domain,
+    path = path,
+    secure = secure,
+    httpOnly = httpOnly,
+    // OkHttp stores absolute expiry as epoch millis; ktor uses max-age in seconds
+    maxAge = if (persistent) ((expiresAt - System.currentTimeMillis()) / 1000).toInt().coerceAtLeast(0) else -1,
+    encoding = CookieEncoding.RAW,
+)
+
+private fun KtorCookie.toOkHttpCookie(requestUrl: okhttp3.HttpUrl): OkHttpCookie? {
+    val builder = OkHttpCookie.Builder()
+        .name(name)
+        .value(value)
+        .path(path ?: "/")
+
+    // Domain: ktor may omit it (means request-host only)
+    val cookieDomain = domain ?: requestUrl.host
+    builder.domain(cookieDomain)
+
+    if (secure) builder.secure()
+    if (httpOnly) builder.httpOnly()
+
+    when {
+        maxAge != null && maxAge!! > 0 ->
+            builder.expiresAt(System.currentTimeMillis() + maxAge!! * 1000L)
+        maxAge != null && maxAge!! == 0 ->
+            builder.expiresAt(0L) // expired / delete signal
+        // maxAge == -1 means session cookie → no expiresAt → OkHttp treats as session cookie
+    }
+
+    return runCatching { builder.build() }.getOrNull()
+}
+
+// ===
+
+class PreferenceStore(name: String = "source_ireader") : PreferenceStore {
 
     private val prefs: SharedPreferences by lazy {
         Injekt.get<Application>()
-            .getSharedPreferences("source_ireader", 0x0000)
+            .getSharedPreferences(name, 0x0000)
     }
 
     private val json = Json { ignoreUnknownKeys = true }

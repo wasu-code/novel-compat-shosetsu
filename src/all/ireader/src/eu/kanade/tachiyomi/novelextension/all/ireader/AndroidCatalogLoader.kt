@@ -162,8 +162,7 @@ class AndroidCatalogLoader(
 
         val nsfw = metadata.getInt(METADATA_NSFW, 0) == 1
 
-//        val preferenceSource = Injekt.get<Application>().getSharedPreferences("source_$pkgName", 0x0000)
-        val dependencies = Dependencies(httpClients, DummyPreferenceStore())
+        val dependencies = Dependencies(httpClients, PreferenceStore("source_ireader_$pkgName"))
 
         return ValidatedData(
             versionCode,
