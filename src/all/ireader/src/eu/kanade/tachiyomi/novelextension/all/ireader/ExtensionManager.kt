@@ -10,7 +10,10 @@ import android.content.IntentFilter
 import android.content.pm.PackageManager
 import android.os.Build
 import android.os.Environment
+import android.os.Handler
+import android.os.Looper
 import androidx.core.net.toUri
+import kuchihige.utils.log
 import uy.kohesive.injekt.Injekt
 import uy.kohesive.injekt.api.get
 import java.io.File
@@ -41,6 +44,7 @@ object ExtensionManager {
     init {
         val receiver = object : BroadcastReceiver() {
             override fun onReceive(context: Context, intent: Intent) {
+                "received something".log()
                 val packageName =
                     intent.data?.schemeSpecificPart ?: return
 
@@ -114,27 +118,9 @@ object ExtensionManager {
 
 //      === Install when download completes =====================================
 
-        val downloadReceiver = object : BroadcastReceiver() {
-            override fun onReceive(context: Context, intent: Intent) {
-                val id = intent.getLongExtra(
-                    DownloadManager.EXTRA_DOWNLOAD_ID,
-                    -1,
-                )
-
-                if (id != downloadId) return
-
-                try {
-                    installApk(context, dm, downloadId)
-                } finally {
-                    safeUnregister(this)
-                }
-            }
+        waitForDownload(dm, downloadId) {
+            installApk(hostContext, dm, downloadId)
         }
-
-        registerReceiverCompat(
-            downloadReceiver,
-            IntentFilter(DownloadManager.ACTION_DOWNLOAD_COMPLETE),
-        )
 
 //      === Cleanup after package install =======================================
 
@@ -245,5 +231,45 @@ object ExtensionManager {
                 addDataScheme("package")
             },
         )
+    }
+
+    private fun waitForDownload(
+        dm: DownloadManager,
+        downloadId: Long,
+        onComplete: () -> Unit,
+    ) {
+        val handler = Handler(Looper.getMainLooper())
+
+        val runnable = object : Runnable {
+            override fun run() {
+                val query = DownloadManager.Query()
+                    .setFilterById(downloadId)
+
+                dm.query(query)?.use { cursor ->
+                    if (cursor.moveToFirst()) {
+                        val status = cursor.getInt(
+                            cursor.getColumnIndexOrThrow(
+                                DownloadManager.COLUMN_STATUS,
+                            ),
+                        )
+
+                        when (status) {
+                            DownloadManager.STATUS_SUCCESSFUL -> {
+                                onComplete()
+                                return
+                            }
+
+                            DownloadManager.STATUS_FAILED -> {
+                                return
+                            }
+                        }
+                    }
+                }
+
+                handler.postDelayed(this, 500)
+            }
+        }
+
+        handler.post(runnable)
     }
 }
