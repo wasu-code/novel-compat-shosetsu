@@ -5,6 +5,7 @@ import android.app.Application
 import android.content.Context
 import android.os.Build
 import android.util.Log
+import android.widget.EditText
 import androidx.preference.EditTextPreference
 import androidx.preference.MultiSelectListPreference
 import androidx.preference.Preference
@@ -29,6 +30,7 @@ import kuchihige.utils.setIcon
 import rx.Observable
 import uy.kohesive.injekt.Injekt
 import uy.kohesive.injekt.api.get
+import java.util.Locale
 import java.util.concurrent.CountDownLatch
 import java.util.concurrent.atomic.AtomicInteger
 import kotlin.collections.intersect
@@ -84,7 +86,64 @@ class IReaderSettings :
             setDefaultValue(repos)
         }.also(filterCategory::addPreference)
 
-        // TODO: language and search filters
+        val enabledLanguages = MultiSelectListPreference(screen.context).apply {
+            key = "LANG_FILTER"
+            title = "Filter by language"
+            summary = "Initialized with your local language and multilingual extensions"
+
+            val languages = setOf("all" to "Multilingual") +
+                Locale.getISOLanguages()
+                    .map { code ->
+                        val locale = Locale(code)
+                        code to locale.getDisplayLanguage(locale)
+                    }
+                    .sortedBy { it.second.lowercase(Locale.getDefault()) }
+            entries = languages.map { it.second }.toTypedArray()
+            entryValues = languages.map { it.first }.toTypedArray()
+
+            val userLang = Locale.getDefault().language
+            setDefaultValue(setOf("all", userLang))
+        }.also(filterCategory::addPreference)
+
+        newPreference(screen.context) {
+            setIcon(android.R.drawable.ic_menu_search)
+            setOnPreferenceClickListener {
+                val input = EditText(screen.context).apply {
+                    setText(filters.query)
+                }
+
+                AlertDialog.Builder(screen.context)
+                    .setTitle("Search")
+                    .setMessage("Use global search to search across all languages and repos")
+                    .setPositiveButton("Search") { _, _ ->
+                        val query = input.text.toString()
+
+                        filters.query = query
+                        updateExtensionList(screen, filters)
+                        summary = query
+                    }
+                    .setNeutralButton("Global search") { _, _ ->
+                        val query = input.text.toString()
+
+                        filters.query = query
+                        // search across all repos and ignore language for this search only
+                        val tempFilters = filters.copy().apply {
+                            this.repos = this.allRepos
+                            this.languages = emptySet()
+                        }
+                        updateExtensionList(screen, tempFilters)
+                        summary = query
+                    }
+                    .setNegativeButton("Clear") { _, _ ->
+                        filters.query = ""
+                        updateExtensionList(screen, filters)
+                        summary = ""
+                    }
+                    .setView(input)
+                    .show()
+                false
+            }
+        }.also(screen::addPreference)
 
         allRepos.setOnPreferenceChangeListener { _, newValue ->
             val repos = parseRepos(newValue as String)
@@ -114,10 +173,18 @@ class IReaderSettings :
             true
         }
 
+        enabledLanguages.setOnPreferenceChangeListener { _, newValue ->
+            @Suppress("unchecked_cast")
+            filters.languages = newValue as Set<String>
+            updateExtensionList(screen, filters)
+            true
+        }
+
         // initial load of extensions lists
         filters.apply {
             this.allRepos = parseRepos(allRepos.text ?: "")
             this.repos = enabledRepos.values
+            this.languages = enabledLanguages.values
         }
         updateExtensionList(screen, filters)
     }
@@ -156,7 +223,8 @@ class IReaderSettings :
                 try {
                     val extensions = RepositoryManager.getRepo(repoUrl)
                     val filteredExtensions = extensions.filter { extension ->
-                        (current.query.isBlank() || extension.name.contains(current.query, ignoreCase = true))
+                        (current.query.isBlank() || extension.name.contains(current.query, ignoreCase = true)) &&
+                            (current.languages.isEmpty() || extension.lang in current.languages)
                     }
 
                     runOnMain {
