@@ -27,6 +27,7 @@ import uy.kohesive.injekt.Injekt
 import uy.kohesive.injekt.api.get
 import ireader.core.source.CatalogSource as IReaderCatalogueSource
 import ireader.core.source.HttpSource as IReaderHttpSource
+import androidx.core.content.edit
 
 class IReaderFactory : SourceFactory {
     private val hostContext by lazy { Injekt.get<Application>() }
@@ -98,35 +99,35 @@ class DummyPreferenceStore : PreferenceStore {
         key,
         defaultValue,
         { prefs.getString(key, defaultValue) ?: defaultValue },
-        { prefs.edit().putString(key, it).apply() },
+        { prefs.edit { putString(key, it) } },
     )
 
     override fun getLong(key: String, defaultValue: Long) = createPref(
         key,
         defaultValue,
         { prefs.getLong(key, defaultValue) },
-        { prefs.edit().putLong(key, it).apply() },
+        { prefs.edit { putLong(key, it) } },
     )
 
     override fun getInt(key: String, defaultValue: Int) = createPref(
         key,
         defaultValue,
         { prefs.getInt(key, defaultValue) },
-        { prefs.edit().putInt(key, it).apply() },
+        { prefs.edit { putInt(key, it) } },
     )
 
     override fun getFloat(key: String, defaultValue: Float) = createPref(
         key,
         defaultValue,
         { prefs.getFloat(key, defaultValue) },
-        { prefs.edit().putFloat(key, it).apply() },
+        { prefs.edit { putFloat(key, it) } },
     )
 
     override fun getBoolean(key: String, defaultValue: Boolean) = createPref(
         key,
         defaultValue,
         { prefs.getBoolean(key, defaultValue) },
-        { prefs.edit().putBoolean(key, it).apply() },
+        { prefs.edit { putBoolean(key, it) } },
     )
 
     override fun getStringSet(
@@ -136,7 +137,7 @@ class DummyPreferenceStore : PreferenceStore {
         key,
         defaultValue,
         { prefs.getStringSet(key, defaultValue) ?: defaultValue },
-        { prefs.edit().putStringSet(key, it).apply() },
+        { prefs.edit { putStringSet(key, it) } },
     )
 
     override fun <T> getObject(
@@ -150,7 +151,7 @@ class DummyPreferenceStore : PreferenceStore {
         {
             prefs.getString(key, null)?.let(deserializer) ?: defaultValue
         },
-        { prefs.edit().putString(key, serializer(it)).apply() },
+        { prefs.edit { putString(key, serializer(it)) } },
     )
 
     override fun <T> getJsonObject(
@@ -167,10 +168,12 @@ class DummyPreferenceStore : PreferenceStore {
             } ?: defaultValue
         },
         {
-            prefs.edit().putString(
-                key,
-                json.encodeToString(serializer, it),
-            ).apply()
+            prefs.edit {
+                putString(
+                    key,
+                    json.encodeToString(serializer, it),
+                )
+            }
         },
     )
 
