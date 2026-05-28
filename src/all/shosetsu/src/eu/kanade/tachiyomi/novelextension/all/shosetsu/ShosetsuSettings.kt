@@ -454,8 +454,6 @@ class ShosetsuSettings :
         }
     }
 
-
-
 //  === Unused ================================================================
 
     override fun fetchChapterList(manga: SManga): Observable<List<SChapter>> = throw UnsupportedOperationException("Not used")
