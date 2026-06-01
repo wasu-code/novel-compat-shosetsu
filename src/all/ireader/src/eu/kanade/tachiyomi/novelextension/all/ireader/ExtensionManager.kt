@@ -50,6 +50,41 @@ object ExtensionRegistry {
     /** List of extensions that are installed but not yet associated with any repo  */
     val orphaned
         get() = installed.filter { it.pkgName !in knownPackageNames }
+
+    fun get(packageName: String) = installed.find { it.pkgName == packageName }
+
+    fun remove(packageName: String) = installed.removeIf { it.pkgName == packageName }
+
+    fun add(packageName: String) {
+        val pm = Injekt.get<Application>().packageManager
+
+        val packageInfo = runCatching {
+            pm.getPackageInfo(packageName, 0)
+        }.getOrNull() ?: return
+
+        val appInfo = runCatching {
+            pm.getApplicationInfo(packageName, 0)
+        }.getOrNull()
+
+        installed.add(
+            CatalogInstalled.SystemWide(
+                name = appInfo?.loadLabel(pm)?.toString() ?: packageName,
+                description = "",
+                source = null,
+                pkgName = packageName,
+                versionName = packageInfo.versionName ?: "",
+                versionCode = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
+                    packageInfo.longVersionCode.toInt()
+                } else {
+                    @Suppress("Deprecation")
+                    packageInfo.versionCode
+                },
+                nsfw = false,
+                iconUrl = "",
+                installDir = null,
+            ),
+        )
+    }
 }
 
 object ExtensionManager {
@@ -144,6 +179,7 @@ object ExtensionManager {
 
                 cleanupApk(ext)
                 onInstall()
+                ExtensionRegistry.add(packageName)
                 safeUnregister(this)
             }
         }
@@ -233,6 +269,7 @@ object ExtensionManager {
                 if (packageName != ext.packageName) return
 
                 onUninstall()
+                ExtensionRegistry.remove(packageName)
                 safeUnregister(this)
             }
         }

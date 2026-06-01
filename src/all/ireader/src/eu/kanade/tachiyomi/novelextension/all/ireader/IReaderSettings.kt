@@ -1,9 +1,7 @@
 package eu.kanade.tachiyomi.novelextension.all.ireader
 
 import android.app.AlertDialog
-import android.app.Application
 import android.content.Context
-import android.os.Build
 import android.util.Log
 import android.widget.EditText
 import androidx.preference.EditTextPreference
@@ -28,8 +26,6 @@ import kuchihige.utils.removePreference
 import kuchihige.utils.runOnMain
 import kuchihige.utils.setIcon
 import rx.Observable
-import uy.kohesive.injekt.Injekt
-import uy.kohesive.injekt.api.get
 import java.util.Locale
 import java.util.concurrent.CountDownLatch
 import java.util.concurrent.atomic.AtomicInteger
@@ -47,8 +43,6 @@ class IReaderSettings :
 
     // display name
     override fun toString(): String = "Settings"
-
-    private val hostContext by lazy { Injekt.get<Application>() }
 
     private data class ExtensionListFilters(
         var allRepos: Set<String> = emptySet(),
@@ -240,12 +234,11 @@ class IReaderSettings :
                                 },
                             )
                         } else {
-                            // .sortedWith(
-                            //                                compareByDescending<RepoExtension> { it.hasUpdate }
-                            //                                    .thenByDescending { it.isInstalled }
-                            //                                    .thenBy { it.name },
-                            //                            )
-                            filteredExtensions.forEach { ext ->
+                            filteredExtensions.sortedWith(
+                                compareByDescending<RepoExtension> { it.hasUpdate() }
+                                    .thenByDescending { it.isInstalled() }
+                                    .thenBy { it.name },
+                            ).forEach { ext ->
                                 category.addPreference(createExtensionPreference(context, ext, repoUrl))
                             }
                         }
@@ -286,18 +279,19 @@ class IReaderSettings :
                     }.also(screen::addPreference)
 
                     orphanedExtensions.forEach { catalog ->
-                        val fakeExt = RepoExtension(
-                            packageName = catalog.pkgName,
-                            apkName = "",
-                            name = catalog.name,
-                            id = catalog.sourceId,
-                            lang = "",
-                            code = 0,
-                            version = "",
-                            description = "",
-                            isNSFW = false,
-                            sourceDir = "",
-                        )
+                        val fakeExt =
+                            RepoExtension(
+                                packageName = catalog.pkgName,
+                                apkName = "",
+                                name = catalog.name,
+                                id = catalog.sourceId,
+                                lang = "",
+                                code = 0,
+                                version = "",
+                                description = "",
+                                isNSFW = false,
+                                sourceDir = "",
+                            )
                         orphanedCategory.addPreference(createExtensionPreference(context, fakeExt, ""))
                     }
                 }
@@ -311,26 +305,15 @@ class IReaderSettings :
         repoUrl: String,
     ): Preference = newPreference(context) {
         title = ext.name
-        val info = runCatching {
-            hostContext.packageManager.getPackageInfo(ext.packageName, 0)
-        }.getOrNull()
-        val installedVersionCode: Long? = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
-            info?.longVersionCode
-        } else {
-            @Suppress("Deprecation")
-            info?.versionCode?.toLong()
-        }
-        val isInstalled = info != null
-        val hasUpdate = isInstalled && (ext.code > (installedVersionCode ?: -1))
         summary = """
-            ${ext.lang} •  ${ext.version} ${"🔺 ${info?.versionName}".takeIf { hasUpdate } ?: ""}
+            ${ext.lang} •  ${ext.version} ${"🔺 ${ext.installedVersionName()}".takeIf { ext.hasUpdate() } ?: ""}
             ${ext.description}
         """.trimIndent().trimEnd()
         updateExtensionIcon(
             when {
                 repoUrl.isBlank() -> ExtensionState.Orphaned
-                hasUpdate -> ExtensionState.UpdatePending
-                isInstalled -> ExtensionState.Installed
+                ext.hasUpdate() -> ExtensionState.UpdatePending
+                ext.isInstalled() -> ExtensionState.Installed
                 else -> ExtensionState.Available
             },
         )

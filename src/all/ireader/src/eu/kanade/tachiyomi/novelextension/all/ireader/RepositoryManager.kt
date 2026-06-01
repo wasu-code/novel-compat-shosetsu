@@ -34,6 +34,13 @@ data class RepoExtension(
     val sourceDir: String,
 )
 
+fun RepoExtension.isInstalled(): Boolean = ExtensionRegistry.get(packageName) != null
+fun RepoExtension.hasUpdate(): Boolean {
+    val catalog = ExtensionRegistry.get(packageName) ?: return false
+    return this.code > catalog.versionCode
+}
+fun RepoExtension.installedVersionName() = ExtensionRegistry.get(packageName)?.versionName ?: "?"
+
 object RepositoryManager {
     private val json = Json {
         ignoreUnknownKeys = true
