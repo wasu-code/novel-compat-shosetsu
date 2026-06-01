@@ -1,5 +1,16 @@
 [
   {
+    "name": "NovelApp: IReader",
+    "pkg": "eu.kanade.tachiyomi.novelextension.all.ireader",
+    "apk": "tsundoku-all.ireader-v1.4.1.apk",
+    "lang": "all",
+    "code": 1,
+    "version": "1.4.1",
+    "nsfw": 0,
+    "isNovel": true,
+    "sources": []
+  },
+  {
     "name": "NovelApp: Shosetsu",
     "pkg": "eu.kanade.tachiyomi.novelextension.all.shosetsu",
     "apk": "tsundoku-all.shosetsu-v1.4.7.apk",
