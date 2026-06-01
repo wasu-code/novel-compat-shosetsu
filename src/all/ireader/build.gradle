@@ -1,0 +1,29 @@
+ext {
+    extName = "IReader"
+    extClass = ".IReaderFactory"
+    extVersionCode = 1
+    isNovel = true
+}
+
+apply from: "$rootDir/common.gradle"
+
+dependencies {
+    //noinspection UseTomlInstead
+    compileOnly("androidx.preference:preference-ktx:1.2.1")
+    //noinspection UseTomlInstead
+    implementation("io.github.ireaderorg:source-api:1.5.1") {
+        exclude group: "com.squareup.okhttp3"
+        exclude group: "com.squareup.okio"
+        exclude group: "org.jetbrains.kotlinx", module: "kotlinx-coroutines-core"
+        exclude group: "org.jetbrains.kotlinx", module: "kotlinx-coroutines-android"
+        exclude group: "org.jetbrains.kotlin", module: "kotlin-stdlib"
+    }
+}
+
+android {
+    compileSdk 36
+
+    defaultConfig {
+        minSdk 26
+    }
+}
