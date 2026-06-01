@@ -325,7 +325,7 @@ class IReaderSettings :
         summary = """
             ${ext.lang} •  ${ext.version} ${"🔺 ${info?.versionName}".takeIf { hasUpdate } ?: ""}
             ${ext.description}
-        """.trimIndent()
+        """.trimIndent().trimEnd()
         updateExtensionIcon(
             when {
                 repoUrl.isBlank() -> ExtensionState.Orphaned
