@@ -40,8 +40,8 @@ class IReaderFactory : SourceFactory {
         OkHttpCookiesStorage(nh.client.cookieJar)
     }
 
-    override fun createSources(): List<Source> {
-        val extensions = runBlocking {
+    private val extensions by lazy {
+        runBlocking {
             AndroidCatalogLoader(
                 hostContext,
                 HttpClients(
@@ -58,13 +58,14 @@ class IReaderFactory : SourceFactory {
                     networkConfig = NetworkConfig(),
                 ),
             ).loadAll()
-        }.also {
-            ExtensionRegistry.installed.addAll(it.filterIsInstance<CatalogInstalled>())
         }
+            .also { ExtensionRegistry.installed.addAll(it.filterIsInstance<CatalogInstalled>()) }
+    }
 
-        return buildList {
+    override fun createSources(): List<Source> = buildList {
 //            CatalogueSourceAdapter(TestSource()).also(::add)
-            IReaderSettings().also(::add)
+        IReaderSettings().also(::add)
+        runCatching {
             extensions.forEach { item ->
                 when (val source = item.source) {
                     is IReaderHttpSource ->
