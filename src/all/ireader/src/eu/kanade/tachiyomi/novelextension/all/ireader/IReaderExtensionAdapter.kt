@@ -89,28 +89,29 @@ class HttpSourceAdapter(
 
     override fun getChapterUrl(chapter: SChapter): String = getUrl(chapter.url)
 
-    override suspend fun fetchPageText(page: Page): String = "<p>" + page.url + "</p>"
-
     override fun fetchPopularManga(page: Int): Observable<MangasPage> = c.fetchPopularManga(page)
-    override fun popularMangaRequest(page: Int): Request = throw Exception("I expected it not to be used")
-    override fun popularMangaParse(response: Response): MangasPage = throw Exception("I expected it not to be used")
-
-    override fun fetchSearchManga(page: Int, query: String, filters: FilterList): Observable<MangasPage> = c.fetchSearchManga(page, query, filters)
-    override fun searchMangaRequest(page: Int, query: String, filters: FilterList): Request = throw Exception("I expected it not to be used")
-    override fun searchMangaParse(response: Response): MangasPage = throw Exception("I expected it not to be used")
 
     override fun fetchLatestUpdates(page: Int): Observable<MangasPage> = c.fetchLatestUpdates(page)
-    override fun latestUpdatesRequest(page: Int): Request = throw Exception("I expected it not to be used")
-    override fun latestUpdatesParse(response: Response): MangasPage = throw Exception("I expected it not to be used")
+
+    override fun fetchSearchManga(page: Int, query: String, filters: FilterList): Observable<MangasPage> = c.fetchSearchManga(page, query, filters)
 
     override fun fetchMangaDetails(manga: SManga): Observable<SManga> = c.fetchMangaDetails(manga)
-    override fun mangaDetailsParse(response: Response): SManga = throw Exception("I expected it not to be used")
 
     override fun fetchChapterList(manga: SManga): Observable<List<SChapter>> = c.fetchChapterList(manga)
-    override fun chapterListParse(response: Response): List<SChapter> = throw Exception("I expected it not to be used")
 
     override fun fetchPageList(chapter: SChapter): Observable<List<Page>> = c.fetchPageList(chapter)
-    override fun pageListParse(response: Response): List<Page> = throw Exception("I expected it not to be used")
 
+    override suspend fun fetchPageText(page: Page): String = "<p>" + page.url + "</p>"
+
+    // Not used
+    override fun popularMangaRequest(page: Int): Request = throw Exception("I expected it not to be used")
+    override fun popularMangaParse(response: Response): MangasPage = throw Exception("I expected it not to be used")
+    override fun searchMangaRequest(page: Int, query: String, filters: FilterList): Request = throw Exception("I expected it not to be used")
+    override fun searchMangaParse(response: Response): MangasPage = throw Exception("I expected it not to be used")
+    override fun latestUpdatesRequest(page: Int): Request = throw Exception("I expected it not to be used")
+    override fun latestUpdatesParse(response: Response): MangasPage = throw Exception("I expected it not to be used")
+    override fun mangaDetailsParse(response: Response): SManga = throw Exception("I expected it not to be used")
+    override fun chapterListParse(response: Response): List<SChapter> = throw Exception("I expected it not to be used")
+    override fun pageListParse(response: Response): List<Page> = throw Exception("I expected it not to be used")
     override fun imageUrlParse(response: Response): String = throw Exception("I expected it not to be used")
 }
