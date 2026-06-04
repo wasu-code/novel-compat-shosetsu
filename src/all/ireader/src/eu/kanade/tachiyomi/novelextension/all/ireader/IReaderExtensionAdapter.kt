@@ -15,7 +15,9 @@ import rx.Observable
 import ireader.core.source.CatalogSource as IReaderCatalogueSource
 import ireader.core.source.HttpSource as IReaderHttpSource
 
-open class CatalogueSourceAdapter(private val ext: IReaderCatalogueSource) : CatalogueSource {
+open class CatalogueSourceAdapter(private val ext: IReaderCatalogueSource) :
+    CatalogueSource,
+    NovelSource {
     override val id: Long = ext.id
     override val name: String = ext.name
     override val lang: String = ext.lang
@@ -59,6 +61,8 @@ open class CatalogueSourceAdapter(private val ext: IReaderCatalogueSource) : Cat
         val chapterContent = pages.map { it.toPage() }.joinToString("") { "<p>" + it.url + "</p>" }
         Observable.just(listOf(Page(index = 0, url = chapterContent)))
     }
+
+    override suspend fun fetchPageText(page: Page): String = "<p>" + page.url + "</p>"
 }
 
 class HttpSourceAdapter(
@@ -85,6 +89,8 @@ class HttpSourceAdapter(
 
     override fun getChapterUrl(chapter: SChapter): String = getUrl(chapter.url)
 
+    override suspend fun fetchPageText(page: Page): String = "<p>" + page.url + "</p>"
+
     override fun fetchPopularManga(page: Int): Observable<MangasPage> = c.fetchPopularManga(page)
     override fun popularMangaRequest(page: Int): Request = throw Exception("I expected it not to be used")
     override fun popularMangaParse(response: Response): MangasPage = throw Exception("I expected it not to be used")
@@ -107,6 +113,4 @@ class HttpSourceAdapter(
     override fun pageListParse(response: Response): List<Page> = throw Exception("I expected it not to be used")
 
     override fun imageUrlParse(response: Response): String = throw Exception("I expected it not to be used")
-
-    override suspend fun fetchPageText(page: Page): String = "<p>" + page.url + "</p>"
 }
