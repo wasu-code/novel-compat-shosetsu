@@ -62,7 +62,11 @@ class IReaderSettings :
             title = "Repositories"
             summary = "Add URLs of repositories providing IReader extensions"
             dialogTitle = "Repositories URLs"
-            dialogMessage = "One per line"
+            dialogMessage = """
+                One URL per line.
+                URL should end with / (slash) symbol (index.json part should be omitted).
+                Example: https://example.com/cool-extensions/repov2/
+            """.trimIndent()
         }.also(screen::addPreference)
 
         val filterCategory = PreferenceCategory(screen.context).apply {
