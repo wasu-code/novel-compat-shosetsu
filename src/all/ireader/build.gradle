@@ -1,7 +1,7 @@
 ext {
     extName = "IReader"
     extClass = ".IReaderFactory"
-    extVersionCode = 2
+    extVersionCode = 3
     isNovel = true
 }
 

@@ -93,6 +93,8 @@ class HttpSourceAdapter(
 
     override fun fetchLatestUpdates(page: Int): Observable<MangasPage> = c.fetchLatestUpdates(page)
 
+    override fun getFilterList(): FilterList = c.getFilterList()
+
     override fun fetchSearchManga(page: Int, query: String, filters: FilterList): Observable<MangasPage> = c.fetchSearchManga(page, query, filters)
 
     override fun fetchMangaDetails(manga: SManga): Observable<SManga> = c.fetchMangaDetails(manga)

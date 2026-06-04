@@ -29,7 +29,7 @@ fun IReaderFilter<*>.toFilter(): Filter<*> = when (this) {
     is IReaderFilter.Text -> TextFilter(name, value)
     is IReaderFilter.Group -> GroupFilter(name, filters.map { it.toFilter() })
     is IReaderFilter.Select -> ListFilter(name, options, value)
-    is IReaderFilter.Sort -> SortFilter(name, options, value?.toSelection() ?: Filter.Sort.Selection(0, true)) // TODO
+    is IReaderFilter.Sort -> SortFilter(name, options, value?.toSelection() ?: Filter.Sort.Selection(0, true))
     is IReaderFilter.Check -> TriStateFilter(
         name,
         value.let {
