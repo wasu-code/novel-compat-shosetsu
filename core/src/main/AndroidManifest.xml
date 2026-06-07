@@ -1,14 +1,18 @@
 <?xml version="1.0" encoding="utf-8"?>
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
 
-    <uses-feature android:name="tachiyomi.extension" /> <!-- compatibility with Tsundoku -->
-    <uses-feature android:name="tachiyomi.novelextension" /> <!-- currently not used by any host app -->
+    <uses-feature android:name="tachiyomi.extension" /> <!-- Legacy approach -->
+    <uses-feature android:name="tachiyomi.novelextension" />
 
     <application android:icon="@mipmap/ic_launcher" android:allowBackup="false" android:label="${appName}">
 
         <meta-data android:name="tachiyomi.extension.class" android:value="${extClass}" />
         <meta-data android:name="tachiyomi.extension.nsfw" android:value="${nsfw}" />
         <meta-data android:name="tachiyomi.extension.novel" android:value="${novel}" />
+
+        <meta-data android:name="tachiyomi.novelextension.class" android:value="${extClass}" />
+        <meta-data android:name="tachiyomi.novelextension.nsfw" android:value="${nsfw}" />
+        <meta-data android:name="tachiyomi.novelextension.novel" android:value="${novel}" />
 
     </application>
 
