@@ -45,15 +45,15 @@ open class CatalogueSourceAdapter(private val ext: IReaderCatalogueSource) :
 
     override fun getFilterList(): FilterList = ext.getFilters().toFilterList()
 
-    override fun fetchChapterList(manga: SManga): Observable<List<SChapter>> = runBlocking {
+    override suspend fun getChapterList(manga: SManga): List<SChapter> {
         // TODO: if ext.supportsPaginatedChapters() go through all pages
         val chapters = ext.getChapterList(manga.toMangaInfo(), emptyList())
-        Observable.just(chapters.map { it.toSChapter() })
+        return chapters.map { it.toSChapter() }
     }
 
-    override fun fetchMangaDetails(manga: SManga): Observable<SManga> = runBlocking {
+    override suspend fun getMangaDetails(manga: SManga): SManga {
         val details = ext.getMangaDetails(manga.toMangaInfo(), emptyList())
-        Observable.just(details.toSManga())
+        return details.toSManga()
     }
 
     override fun fetchPageList(chapter: SChapter): Observable<List<Page>> = runBlocking {
@@ -102,9 +102,9 @@ class HttpSourceAdapter(
 
     override fun fetchSearchManga(page: Int, query: String, filters: FilterList): Observable<MangasPage> = c.fetchSearchManga(page, query, filters)
 
-    override fun fetchMangaDetails(manga: SManga): Observable<SManga> = c.fetchMangaDetails(manga)
+    override suspend fun getMangaDetails(manga: SManga): SManga = c.getMangaDetails(manga)
 
-    override fun fetchChapterList(manga: SManga): Observable<List<SChapter>> = c.fetchChapterList(manga)
+    override suspend fun getChapterList(manga: SManga): List<SChapter> = c.getChapterList(manga)
 
     override fun fetchPageList(chapter: SChapter): Observable<List<Page>> = c.fetchPageList(chapter)
 
