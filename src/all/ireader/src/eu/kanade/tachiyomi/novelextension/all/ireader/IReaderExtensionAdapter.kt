@@ -8,6 +8,7 @@ import eu.kanade.tachiyomi.source.model.Page
 import eu.kanade.tachiyomi.source.model.SChapter
 import eu.kanade.tachiyomi.source.model.SManga
 import eu.kanade.tachiyomi.source.online.HttpSource
+import ireader.core.source.model.ChapterInfo
 import kotlinx.coroutines.runBlocking
 import okhttp3.Request
 import okhttp3.Response
@@ -56,13 +57,17 @@ open class CatalogueSourceAdapter(private val ext: IReaderCatalogueSource) :
     }
 
     override fun fetchPageList(chapter: SChapter): Observable<List<Page>> = runBlocking {
-        val pages = ext.getPageList(chapter.toChapterInfo(), emptyList())
-//        Observable.just(pages.map { it.toPage() })
-        val chapterContent = pages.map { it.toPage() }.joinToString("") { "<p>" + it.url + "</p>" }
-        Observable.just(listOf(Page(index = 0, url = chapterContent)))
+        Observable.just(listOf(Page(index = 0, url = chapter.url)))
     }
 
-    override suspend fun fetchPageText(page: Page): String = "<p>" + page.url + "</p>"
+    override suspend fun fetchPageText(page: Page): String {
+        val chapterInfo = ChapterInfo(key = page.url, name = "")
+
+        val pages = ext.getPageList(chapterInfo, emptyList())
+        val chapterContent = pages.map { it.toPage() }.joinToString("") { "<p>" + it.url + "</p>" }
+
+        return chapterContent
+    }
 }
 
 class HttpSourceAdapter(
@@ -103,7 +108,7 @@ class HttpSourceAdapter(
 
     override fun fetchPageList(chapter: SChapter): Observable<List<Page>> = c.fetchPageList(chapter)
 
-    override suspend fun fetchPageText(page: Page): String = "<p>" + page.url + "</p>"
+    override suspend fun fetchPageText(page: Page): String = c.fetchPageText(page)
 
     // Not used
     override fun popularMangaRequest(page: Int): Request = throw Exception("I expected it not to be used")
