@@ -2,17 +2,21 @@ package eu.kanade.tachiyomi.novelextension.all.ireader
 
 import android.annotation.SuppressLint
 import android.app.Application
-import android.app.DownloadManager
 import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
 import android.content.IntentFilter
 import android.content.pm.PackageManager
 import android.os.Build
-import android.os.Environment
-import android.os.Handler
-import android.os.Looper
+import android.util.Log
+import androidx.core.content.FileProvider
 import androidx.core.net.toUri
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
+import okhttp3.OkHttpClient
+import okhttp3.Request
 import uy.kohesive.injekt.Injekt
 import uy.kohesive.injekt.api.get
 import java.io.File
@@ -89,6 +93,7 @@ object ExtensionRegistry {
 
 object ExtensionManager {
     private val hostContext by lazy { Injekt.get<Application>() }
+    private val httpClient = OkHttpClient()
 
     init {
         val receiver = object : BroadcastReceiver() {
@@ -139,59 +144,61 @@ object ExtensionManager {
         )
     }
 
-    @SuppressLint("UnspecifiedRegisterReceiverFlag")
-    fun installExtension(ext: RepoExtension, repoUrl: String, onInstall: () -> Unit) {
-        val apkName = ext.apkName
-        val apkUrl = "$repoUrl/apk/$apkName"
+    fun installExtension(
+        ext: RepoExtension,
+        repoUrl: String,
+        onInstall: () -> Unit,
+    ) {
+        val apkUrl = "$repoUrl/apk/${ext.apkName}"
+        val tmpFile = File(hostContext.cacheDir, "extension_${ext.packageName}_${System.currentTimeMillis()}.apk")
 
-//      === Download ============================================================
-
-        val request = DownloadManager.Request(apkUrl.toUri())
-            .setTitle("Downloading ${ext.name}")
-            .setDescription("Downloading IReader extension ${ext.name}")
-            .setNotificationVisibility(
-                DownloadManager.Request.VISIBILITY_VISIBLE_NOTIFY_COMPLETED,
-            )
-            .setDestinationInExternalPublicDir(
-                Environment.DIRECTORY_DOWNLOADS,
-                apkName,
-            )
-            .setMimeType("application/vnd.android.package-archive")
-
-        val dm = hostContext.getSystemService(
-            Context.DOWNLOAD_SERVICE,
-        ) as DownloadManager
-
-        val downloadId = dm.enqueue(request)
-
-//      === Install when download completes =====================================
-
-        waitForDownload(dm, downloadId) {
-            installApk(hostContext, dm, downloadId)
-        }
-
-//      === Cleanup after package install =======================================
-
-        val installReceiver = object : BroadcastReceiver() {
+        val receiver = object : BroadcastReceiver() {
             override fun onReceive(context: Context, intent: Intent) {
-                val packageName = intent.data?.schemeSpecificPart ?: return
-                if (packageName != ext.packageName) return
+                val pkg = intent.data?.schemeSpecificPart ?: return
+                if (pkg != ext.packageName) return
 
-                cleanupApk(ext)
+                runCatching { tmpFile.delete() }
+                ExtensionRegistry.add(pkg)
                 onInstall()
-                ExtensionRegistry.add(packageName)
+
                 safeUnregister(this)
             }
         }
 
         registerReceiverCompat(
-            installReceiver,
+            receiver,
             IntentFilter().apply {
                 addAction(Intent.ACTION_PACKAGE_ADDED)
                 addAction(Intent.ACTION_PACKAGE_REPLACED)
                 addDataScheme("package")
             },
         )
+
+        CoroutineScope(Dispatchers.IO).launch {
+            try {
+                val request = Request.Builder()
+                    .url(apkUrl)
+                    .build()
+
+                httpClient.newCall(request).execute().use { response ->
+                    if (!response.isSuccessful) error("Download failed: ${response.code}")
+
+                    response.body.byteStream().use { input ->
+                        tmpFile.outputStream().use { output ->
+                            input.copyTo(output)
+                        }
+                    }
+                }
+
+                withContext(Dispatchers.Main) {
+                    installApk(hostContext, tmpFile)
+                }
+            } catch (e: Exception) {
+                runCatching { tmpFile.delete() }
+                safeUnregister(receiver)
+                Log.e("ExtensionManager", "failded to isnatll", e)
+            }
+        }
     }
 
     private fun registerReceiverCompat(
@@ -218,27 +225,26 @@ object ExtensionManager {
         }
     }
 
-    private fun installApk(context: Context, dm: DownloadManager, downloadId: Long) {
-        val uri = dm.getUriForDownloadedFile(downloadId) ?: return
+    private fun installApk(
+        context: Context,
+        apkFile: File,
+    ) {
+        val uri = FileProvider.getUriForFile(
+            context,
+            "${context.packageName}.provider",
+            apkFile,
+        )
 
         val intent = Intent(Intent.ACTION_VIEW).apply {
-            setDataAndType(uri, "application/vnd.android.package-archive")
+            setDataAndType(
+                uri,
+                "application/vnd.android.package-archive",
+            )
             addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
             addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
         }
 
         context.startActivity(intent)
-    }
-
-    fun cleanupApk(ext: RepoExtension) {
-        val file = File(
-            Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS),
-            ext.apkName,
-        )
-
-        if (file.exists()) {
-            file.delete()
-        }
     }
 
     /**
@@ -281,45 +287,5 @@ object ExtensionManager {
                 addDataScheme("package")
             },
         )
-    }
-
-    private fun waitForDownload(
-        dm: DownloadManager,
-        downloadId: Long,
-        onComplete: () -> Unit,
-    ) {
-        val handler = Handler(Looper.getMainLooper())
-
-        val runnable = object : Runnable {
-            override fun run() {
-                val query = DownloadManager.Query()
-                    .setFilterById(downloadId)
-
-                dm.query(query)?.use { cursor ->
-                    if (cursor.moveToFirst()) {
-                        val status = cursor.getInt(
-                            cursor.getColumnIndexOrThrow(
-                                DownloadManager.COLUMN_STATUS,
-                            ),
-                        )
-
-                        when (status) {
-                            DownloadManager.STATUS_SUCCESSFUL -> {
-                                onComplete()
-                                return
-                            }
-
-                            DownloadManager.STATUS_FAILED -> {
-                                return
-                            }
-                        }
-                    }
-                }
-
-                handler.postDelayed(this, 500)
-            }
-        }
-
-        handler.post(runnable)
     }
 }
