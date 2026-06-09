@@ -2,10 +2,10 @@
   {
     "name": "NovelApp: IReader",
     "pkg": "eu.kanade.tachiyomi.novelextension.all.ireader",
-    "apk": "tsundoku-all.ireader-v1.4.3.apk",
+    "apk": "tsundoku-all.ireader-v1.4.4.apk",
     "lang": "all",
-    "code": 3,
-    "version": "1.4.3",
+    "code": 4,
+    "version": "1.4.4",
     "nsfw": 0,
     "isNovel": true,
     "sources": []
