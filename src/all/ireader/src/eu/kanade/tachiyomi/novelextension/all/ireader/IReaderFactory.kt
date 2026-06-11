@@ -85,7 +85,7 @@ class IReaderFactory : SourceFactory {
 
             if (pendingUpdatesCount > 0) {
                 mainHandler.post {
-                    Toast.makeText(hostContext, "$pendingUpdatesCount IReader updates pending", Toast.LENGTH_LONG).show()
+                    Toast.makeText(hostContext, "$pendingUpdatesCount IReader update(s) pending", Toast.LENGTH_LONG).show()
                 }
             }
         }
