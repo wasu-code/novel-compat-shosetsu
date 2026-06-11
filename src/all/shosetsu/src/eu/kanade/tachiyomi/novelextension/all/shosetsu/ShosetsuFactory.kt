@@ -78,8 +78,10 @@ class ShosetsuFactory : SourceFactory {
             // Register extensions from enabled repositories.
             // Remote metadata is loaded in the process.
             enabledRepos.forEach { repoUrl ->
-                RepositoryManager.getRepo(repoUrl).extensions.forEach { ext ->
-                    ShosetsuExtension.fromRemote(ext, repoUrl)
+                runCatching {
+                    RepositoryManager.getRepo(repoUrl).extensions.forEach { ext ->
+                        ShosetsuExtension.fromRemote(ext, repoUrl)
+                    }
                 }
             }
 

@@ -76,8 +76,11 @@ class IReaderFactory : SourceFactory {
             val oneDay = 24 * 60 * 60 * 1000L // 24h
             if (now - lastExtCheck < oneDay) return@launchIO
 
-            val pendingUpdatesCount = enabledRepos.flatMap { RepositoryManager.getRepo(it) }.count { it.hasUpdate() }
-
+            val pendingUpdatesCount =
+                enabledRepos
+                    .mapNotNull { runCatching { RepositoryManager.getRepo(it) }.getOrNull() }
+                    .flatten()
+                    .count { it.hasUpdate() }
             // update timestamp after check
             prefs.edit {
                 putLong("LAST_EXT_CHECK", now)
