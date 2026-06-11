@@ -44,26 +44,27 @@ class IReaderFactory : SourceFactory {
         OkHttpCookiesStorage(nh.client.cookieJar)
     }
 
-    private val extensions = runBlocking {
-        AndroidCatalogLoader(
-            hostContext,
-            HttpClients(
-                context = hostContext,
-                browseEngine = BrowserEngine(),
-                cookiesStorage = cookiesStorage,
-                webViewCookieJar = WebViewCookieJar(
-                    cookiesStorage = cookiesStorage,
-                ),
-                preferencesStore = PreferenceStore(),
-                webViewManager = WebViewManger(
+    private val extensions by lazy {
+        runBlocking {
+            AndroidCatalogLoader(
+                hostContext,
+                HttpClients(
                     context = hostContext,
+                    browseEngine = BrowserEngine(),
+                    cookiesStorage = cookiesStorage,
+                    webViewCookieJar = WebViewCookieJar(
+                        cookiesStorage = cookiesStorage,
+                    ),
+                    preferencesStore = PreferenceStore(),
+                    webViewManager = WebViewManger(
+                        context = hostContext,
+                    ),
+                    networkConfig = NetworkConfig(),
                 ),
-                networkConfig = NetworkConfig(),
-            ),
-        ).loadAll()
+            ).loadAll()
+        }
+            .also { ExtensionRegistry.installed.addAll(it.filterIsInstance<CatalogInstalled>()) }
     }
-        .also { ExtensionRegistry.installed.addAll(it.filterIsInstance<CatalogInstalled>()) }
-
     init {
         val prefs = getPreferences(IReaderSettings.ID)
         val lastExtCheck = prefs.getLong("LAST_EXT_CHECK", 0)
