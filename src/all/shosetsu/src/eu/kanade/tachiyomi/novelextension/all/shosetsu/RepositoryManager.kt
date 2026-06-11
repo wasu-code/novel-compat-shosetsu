@@ -21,6 +21,10 @@ object RepositoryManager {
         isLenient = true
     }
 
+    /**
+     * Fetches the repo index file or loads it from cache.
+     * If index is not yet in cache it will be added after fetching.
+     */
     fun getRepo(url: String): RepoIndex {
         RepoCache.get(url)?.let { return it }
         Log.d("Shosetsu", "Fetching remote repository: $url")

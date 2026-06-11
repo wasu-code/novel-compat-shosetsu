@@ -101,6 +101,10 @@ class ShosetsuExtension(val lang: String, val hash: Hash) {
     }
 
     companion object {
+
+        /**
+         * Retrieves or registers [eu.kanade.tachiyomi.novelextension.all.shosetsu.ShosetsuExtension] from [ExtensionRegistry].
+         */
         fun fromFile(file: File): ShosetsuExtension {
             val lang = file.parentFile?.name ?: "all"
             val hash = file.nameWithoutExtension
@@ -110,6 +114,10 @@ class ShosetsuExtension(val lang: String, val hash: Hash) {
             }
         }
 
+        /**
+         * Retrieves or registers [eu.kanade.tachiyomi.novelextension.all.shosetsu.ShosetsuExtension] from [ExtensionRegistry].
+         * Remote metadata is added in the process.
+         */
         fun fromRemote(ext: RepoExtension, repoUrl: String): ShosetsuExtension {
             val hash = sha256("$repoUrl|${ext.lang}|${ext.fileName}")
 

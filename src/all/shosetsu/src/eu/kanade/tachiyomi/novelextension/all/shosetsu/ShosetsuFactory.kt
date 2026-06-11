@@ -3,13 +3,17 @@ package eu.kanade.tachiyomi.novelextension.all.shosetsu
 import android.app.Application
 import android.util.Log
 import android.webkit.WebSettings
+import android.widget.Toast
+import androidx.core.content.edit
 import app.shosetsu.lib.ShosetsuSharedLib
-import app.shosetsu.lib.lua.LuaExtension
 import app.shosetsu.lib.lua.ShosetsuLuaLib
 import app.shosetsu.lib.lua.shosetsuGlobals
 import eu.kanade.tachiyomi.network.NetworkHelper
 import eu.kanade.tachiyomi.source.Source
 import eu.kanade.tachiyomi.source.SourceFactory
+import keiyoushi.utils.getPreferences
+import kuchihige.utils.launchIO
+import kuchihige.utils.mainHandler
 import uy.kohesive.injekt.Injekt
 import uy.kohesive.injekt.api.get
 
@@ -44,38 +48,72 @@ class ShosetsuFactory : SourceFactory {
                 null
             }
         }
+
+        ExtensionManager.init(hostContext.filesDir)
     }
 
-    override fun createSources(): List<Source> {
-        ExtensionManager.init(hostContext.filesDir)
+    // Register installed extensions.
+    // Local metadata is added during execution of loadLueExtension().
+    val installedExtensions = withExtensionClassLoader(javaClass.classLoader!!) {
+        ExtensionManager.getInstalledExtensionsFiles()
+            .map { file ->
+                val ext = ShosetsuExtension.fromFile(file)
+                ext.loadLuaExtension() to ext.lang
+            }
+//          .plus(LuaExtension(injectLuaPatches(EXT), "DebugExt") to "all")
+    }
 
-        val extensions = withExtensionClassLoader(javaClass.classLoader!!) {
-            ExtensionManager.getInstalledExtensionsFiles()
-                .map { file ->
-                    val ext = ShosetsuExtension.fromFile(file)
-                    ext.loadLuaExtension() to ext.lang
+    init {
+        val prefs = getPreferences(ShosetsuSettings.ID)
+        val lastExtCheck = prefs.getLong("LAST_EXT_CHECK", 0)
+        val enabledRepos = prefs.getStringSet("ENABLED_REPOS", null) ?: emptySet()
+
+        val now = System.currentTimeMillis()
+
+        launchIO {
+            // skip if checked recently
+            val oneDay = 24 * 60 * 60 * 1000L // 24h
+            if (now - lastExtCheck < oneDay) return@launchIO
+
+            // Register extensions from enabled repositories.
+            // Remote metadata is loaded in the process.
+            enabledRepos.forEach { repoUrl ->
+                RepositoryManager.getRepo(repoUrl).extensions.forEach { ext ->
+                    ShosetsuExtension.fromRemote(ext, repoUrl)
                 }
-//                .plus(LuaExtension(injectLuaPatches(EXT), "DebugExt") to "all")
+            }
+
+            // At this point both remote and local metadata should be already loaded
+            // what allows checking for updates
+            val pendingUpdatesCount = ExtensionRegistry.all().count { it.hasUpdate }
+
+            // update timestamp after check
+            prefs.edit {
+                putLong("LAST_EXT_CHECK", now)
+            }
+
+            if (pendingUpdatesCount > 0) {
+                mainHandler.post {
+                    Toast.makeText(hostContext, "$pendingUpdatesCount Shosetsu update(s) pending", Toast.LENGTH_LONG).show()
+                }
+            }
+        }
+    }
+
+    override fun createSources(): List<Source> = buildList {
+        runCatching {
+            ShosetsuSettings().also(::add)
         }
 
-        return extensions
-            .mapNotNull(::safeCreateSource)
-            .plus(
-                // runCatching to prevents crash in CI
-                runCatching {
-                    ShosetsuSettings()
-                }.getOrNull(),
-            )
-            .filterNotNull()
-    }
-
-    private fun safeCreateSource(pair: Pair<LuaExtension, String>): Source? {
-        val (ext, lang) = pair
-        return try {
-            ShosetsuExtensionAdapter(ext, lang)
-        } catch (e: Exception) {
-            Log.e("Shosetsu", "Loading extension failed", e)
-            null
+        installedExtensions.forEach {
+            val (ext, lang) = it
+            runCatching {
+                ShosetsuExtensionAdapter(ext, lang).also(::add)
+            }.onFailure {
+                mainHandler.post {
+                    Toast.makeText(hostContext, "${ext.name} failed to load", Toast.LENGTH_SHORT).show()
+                }
+            }
         }
     }
 }
