@@ -78,14 +78,22 @@ class ShosetsuExtensionAdapter(private val ext: LuaExtension, language: String) 
      * - `PRIMARY` - always available
      * - `SECONDARY` - may not exist
      *
-     * @return index of desired listing or `0`
+     * @return index of desired listing or `null`
      * @throws IllegalArgumentException if wrong key is provided
      */
-    private fun getListingIndex(key: String = "PRIMARY"): Int {
-        require(key in setOf("PRIMARY", "SECONDARY")) { "Invalid listing key: $key" }
-        val desiredListingIndex = preferences.getString("LISTING_$key", "0")?.toInt() ?: 0
-        if (desiredListingIndex > ext.listings.size - 1) return 0
-        return desiredListingIndex
+    private fun getListingIndex(key: String = "PRIMARY"): Int? {
+        val defaultIndex = when (key) {
+            "PRIMARY" -> 0
+            "SECONDARY" -> 1
+            else -> throw IllegalArgumentException("Invalid listing key: $key")
+        }
+
+        val desiredListingIndex = preferences
+            .getString("LISTING_$key", null)
+            ?.toIntOrNull()
+            ?: defaultIndex
+
+        return desiredListingIndex.takeIf { it in ext.listings.indices }
     }
 
     /**
@@ -109,7 +117,7 @@ class ShosetsuExtensionAdapter(private val ext: LuaExtension, language: String) 
     }
 
     override fun fetchPopularNovels(page: Int): Observable<NovelsPage> {
-        val listingIndex = getListingIndex("PRIMARY")
+        val listingIndex = getListingIndex("PRIMARY") ?: throw UnsupportedOperationException("No primary listing")
         val listing = getListing(listingIndex, page)
         return Observable.just(listing)
     }
@@ -118,7 +126,7 @@ class ShosetsuExtensionAdapter(private val ext: LuaExtension, language: String) 
     override fun popularNovelsRequest(page: Int): Request = throw UnsupportedOperationException("Not used")
 
     override fun fetchLatestUpdates(page: Int): Observable<NovelsPage> {
-        val listingIndex = getListingIndex("SECONDARY")
+        val listingIndex = getListingIndex("SECONDARY") ?: throw UnsupportedOperationException("No secondary listing")
         val listing = getListing(listingIndex, page)
         return Observable.just(listing)
     }
