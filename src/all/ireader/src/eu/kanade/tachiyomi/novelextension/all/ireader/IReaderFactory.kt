@@ -2,6 +2,7 @@ package eu.kanade.tachiyomi.novelextension.all.ireader
 
 import android.app.Application
 import android.content.SharedPreferences
+import android.widget.Toast
 import androidx.core.content.edit
 import eu.kanade.tachiyomi.network.NetworkHelper
 import eu.kanade.tachiyomi.source.Source
@@ -16,6 +17,7 @@ import ireader.core.http.WebViewCookieJar
 import ireader.core.http.WebViewManger
 import ireader.core.prefs.Preference
 import ireader.core.prefs.PreferenceStore
+import keiyoushi.utils.getPreferences
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -24,6 +26,8 @@ import kotlinx.coroutines.runBlocking
 import kotlinx.serialization.KSerializer
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.modules.SerializersModule
+import kuchihige.utils.launchIO
+import kuchihige.utils.mainHandler
 import okhttp3.CookieJar
 import okhttp3.HttpUrl.Companion.toHttpUrlOrNull
 import uy.kohesive.injekt.Injekt
@@ -40,26 +44,51 @@ class IReaderFactory : SourceFactory {
         OkHttpCookiesStorage(nh.client.cookieJar)
     }
 
-    private val extensions by lazy {
-        runBlocking {
-            AndroidCatalogLoader(
-                hostContext,
-                HttpClients(
-                    context = hostContext,
-                    browseEngine = BrowserEngine(),
+    private val extensions = runBlocking {
+        AndroidCatalogLoader(
+            hostContext,
+            HttpClients(
+                context = hostContext,
+                browseEngine = BrowserEngine(),
+                cookiesStorage = cookiesStorage,
+                webViewCookieJar = WebViewCookieJar(
                     cookiesStorage = cookiesStorage,
-                    webViewCookieJar = WebViewCookieJar(
-                        cookiesStorage = cookiesStorage,
-                    ),
-                    preferencesStore = PreferenceStore(),
-                    webViewManager = WebViewManger(
-                        context = hostContext,
-                    ),
-                    networkConfig = NetworkConfig(),
                 ),
-            ).loadAll()
+                preferencesStore = PreferenceStore(),
+                webViewManager = WebViewManger(
+                    context = hostContext,
+                ),
+                networkConfig = NetworkConfig(),
+            ),
+        ).loadAll()
+    }
+        .also { ExtensionRegistry.installed.addAll(it.filterIsInstance<CatalogInstalled>()) }
+
+    init {
+        val prefs = getPreferences(IReaderSettings.ID)
+        val lastExtCheck = prefs.getLong("LAST_EXT_CHECK", 0)
+        val enabledRepos = prefs.getStringSet("ENABLED_REPOS", null) ?: emptySet()
+
+        val now = System.currentTimeMillis()
+
+        launchIO {
+            // skip if checked recently
+            val oneDay = 24 * 60 * 60 * 1000L // 24h
+            if (now - lastExtCheck < oneDay) return@launchIO
+
+            val pendingUpdatesCount = enabledRepos.flatMap { RepositoryManager.getRepo(it) }.count { it.hasUpdate() }
+
+            // update timestamp after check
+            prefs.edit {
+                putLong("LAST_EXT_CHECK", now)
+            }
+
+            if (pendingUpdatesCount > 0) {
+                mainHandler.post {
+                    Toast.makeText(hostContext, "$pendingUpdatesCount IReader updates pending", Toast.LENGTH_LONG).show()
+                }
+            }
         }
-            .also { ExtensionRegistry.installed.addAll(it.filterIsInstance<CatalogInstalled>()) }
     }
 
     override fun createSources(): List<Source> = buildList {

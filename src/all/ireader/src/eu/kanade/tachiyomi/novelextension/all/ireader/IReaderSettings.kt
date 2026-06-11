@@ -16,7 +16,6 @@ import eu.kanade.tachiyomi.source.NovelSource
 import eu.kanade.tachiyomi.source.Source
 import eu.kanade.tachiyomi.source.model.Page
 import eu.kanade.tachiyomi.source.model.SChapter
-import eu.kanade.tachiyomi.source.model.SManga
 import kuchihige.utils.getPreference
 import kuchihige.utils.getPreferenceCount
 import kuchihige.utils.launchIO
@@ -35,7 +34,7 @@ class IReaderSettings :
     Source,
     NovelSource,
     ConfigurableSource {
-    override val id: Long = 738210197100101114
+    override val id: Long = ID
     val lang: String = "all"
 
     // `!` character to pin it to the top of the list
@@ -315,7 +314,7 @@ class IReaderSettings :
     ): Preference = newPreference(context) {
         title = ext.name
         summary = """
-            ${ext.lang} •  ${ext.version} ${"🔺 ${ext.installedVersionName()}".takeIf { ext.hasUpdate() } ?: ""}
+            ${ext.lang} •  ${ext.version} ${"→ ${ext.installedVersionName()}".takeIf { ext.hasUpdate() } ?: ""}
             ${ext.description}
         """.trimIndent().trimEnd()
         updateExtensionIcon(
@@ -403,8 +402,10 @@ class IReaderSettings :
     }
 //  === Unused ================================================================
 
-    override fun fetchChapterList(manga: SManga): Observable<List<SChapter>> = throw UnsupportedOperationException("Not used")
-    override fun fetchMangaDetails(manga: SManga): Observable<SManga> = throw UnsupportedOperationException("Not used")
     override fun fetchPageList(chapter: SChapter): Observable<List<Page>> = throw UnsupportedOperationException("Not used")
     override suspend fun fetchPageText(page: Page): String = throw UnsupportedOperationException("Not used")
+
+    companion object {
+        const val ID = 738210197100101114
+    }
 }
