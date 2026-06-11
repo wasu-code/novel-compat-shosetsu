@@ -104,6 +104,11 @@ class IReaderSettings :
         }.also(filterCategory::addPreference)
 
         newPreference(screen.context) {
+            setIcon(android.R.drawable.ic_menu_info_details)
+            summary = "Some repositories use malformed language codes for extensions. To display those use Global Search below or unselect all languages in language filter."
+        }.also(filterCategory::addPreference)
+
+        newPreference(screen.context) {
             setIcon(android.R.drawable.ic_menu_search)
             setOnPreferenceClickListener {
                 val input = EditText(screen.context).apply {
