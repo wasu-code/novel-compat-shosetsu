@@ -81,14 +81,17 @@ class IReaderFactory : SourceFactory {
                     .mapNotNull { runCatching { RepositoryManager.getRepo(it) }.getOrNull() }
                     .flatten()
                     .count { it.hasUpdate() }
+
             // update timestamp after check
             prefs.edit {
                 putLong("LAST_EXT_CHECK", now)
             }
 
             if (pendingUpdatesCount > 0) {
-                mainHandler.post {
-                    Toast.makeText(hostContext, "$pendingUpdatesCount IReader update(s) pending", Toast.LENGTH_LONG).show()
+                runCatching {
+                    mainHandler.post {
+                        Toast.makeText(hostContext, "$pendingUpdatesCount IReader update(s) pending", Toast.LENGTH_LONG).show()
+                    }
                 }
             }
         }

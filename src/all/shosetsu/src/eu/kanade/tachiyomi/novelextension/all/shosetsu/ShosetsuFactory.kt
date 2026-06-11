@@ -95,8 +95,10 @@ class ShosetsuFactory : SourceFactory {
             }
 
             if (pendingUpdatesCount > 0) {
-                mainHandler.post {
-                    Toast.makeText(hostContext, "$pendingUpdatesCount Shosetsu update(s) pending", Toast.LENGTH_LONG).show()
+                runCatching {
+                    mainHandler.post {
+                        Toast.makeText(hostContext, "$pendingUpdatesCount Shosetsu update(s) pending", Toast.LENGTH_LONG).show()
+                    }
                 }
             }
         }
