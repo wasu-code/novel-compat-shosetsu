@@ -1,6 +1,9 @@
 package eu.kanade.tachiyomi.novelextension.all.ireader
 
+import androidx.preference.ListPreference
+import androidx.preference.PreferenceScreen
 import eu.kanade.tachiyomi.source.CatalogueSource
+import eu.kanade.tachiyomi.source.ConfigurableSource
 import eu.kanade.tachiyomi.source.NovelSource
 import eu.kanade.tachiyomi.source.model.FilterList
 import eu.kanade.tachiyomi.source.model.MangasPage
@@ -9,6 +12,7 @@ import eu.kanade.tachiyomi.source.model.SChapter
 import eu.kanade.tachiyomi.source.model.SManga
 import eu.kanade.tachiyomi.source.online.HttpSource
 import ireader.core.source.model.ChapterInfo
+import keiyoushi.utils.getPreferences
 import kotlinx.coroutines.runBlocking
 import okhttp3.Request
 import okhttp3.Response
@@ -18,6 +22,7 @@ import ireader.core.source.HttpSource as IReaderHttpSource
 
 open class CatalogueSourceAdapter(private val ext: IReaderCatalogueSource) :
     CatalogueSource,
+    ConfigurableSource,
     NovelSource {
     override val id: Long = ext.id
     override val name: String = ext.name
@@ -25,13 +30,45 @@ open class CatalogueSourceAdapter(private val ext: IReaderCatalogueSource) :
     override val supportsLatest: Boolean = ext.supportsLatest()
     override fun toString(): String = name
 
-    override fun fetchLatestUpdates(page: Int): Observable<MangasPage> = Observable.empty()
+    val preferences = getPreferences(id)
+
+    /**
+     * Retrieve index of desired listing from shared preferences
+     *
+     * @param key The listing type to fetch. Can be either:
+     * - `PRIMARY` - always available
+     * - `SECONDARY` - may not exist
+     *
+     * @return index of desired listing or `null`
+     * @throws IllegalArgumentException if wrong key is provided
+     */
+    private fun getListingIndex(key: String = "PRIMARY"): Int? {
+        val defaultIndex = when (key) {
+            "PRIMARY" -> 0
+            "SECONDARY" -> 1
+            else -> throw IllegalArgumentException("Invalid listing key: $key")
+        }
+
+        val desiredListingIndex = preferences
+            .getString("LISTING_$key", null)
+            ?.toIntOrNull()
+            ?: defaultIndex
+
+        return desiredListingIndex.takeIf { it in ext.getListings().indices }
+    }
 
     override fun fetchPopularManga(page: Int): Observable<MangasPage> = runBlocking {
-        val listing = ext.getListings().first()
+        val listingIndex = getListingIndex("PRIMARY") ?: throw UnsupportedOperationException("No primary listing")
+        val listing = ext.getListings()[listingIndex]
         Observable.just(
             ext.getMangaList(listing, page).toMangasPage(),
         )
+    }
+
+    override fun fetchLatestUpdates(page: Int): Observable<MangasPage> = runBlocking {
+        val listingIndex = getListingIndex("SECONDARY") ?: throw UnsupportedOperationException("No secondary listing")
+        val listing = ext.getListings()[listingIndex]
+        Observable.just(ext.getMangaList(listing, page).toMangasPage())
     }
 
     override fun fetchSearchManga(
@@ -67,6 +104,35 @@ open class CatalogueSourceAdapter(private val ext: IReaderCatalogueSource) :
         val chapterContent = pages.map { it.toPage() }.joinToString("") { "<p>" + it.url + "</p>" }
 
         return chapterContent
+    }
+
+    override fun setupPreferenceScreen(screen: PreferenceScreen) {
+        val listings = ext.getListings()
+        if (listings.size > 1) {
+            ListPreference(screen.context).apply {
+                key = "LISTING_PRIMARY"
+                title = "Primary listing"
+                entries = listings.map { it.name }.toTypedArray()
+                entryValues = Array(listings.size) { it.toString() }
+                setDefaultValue("0")
+                summary = """
+                Listing to be used when browsing Popular page
+                Selected: %s
+                """.trimIndent()
+            }.also(screen::addPreference)
+
+            ListPreference(screen.context).apply {
+                key = "LISTING_SECONDARY"
+                title = "Secondary listing"
+                entries = listings.map { it.name }.toTypedArray()
+                entryValues = Array(listings.size) { it.toString() }
+                setDefaultValue("1")
+                summary = """
+                    Listing to be used when browsing Latest page
+                    Selected: %s
+                """.trimIndent()
+            }.also(screen::addPreference)
+        }
     }
 }
 
