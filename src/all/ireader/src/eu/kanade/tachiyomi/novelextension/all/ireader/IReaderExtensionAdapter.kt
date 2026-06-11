@@ -48,7 +48,7 @@ open class CatalogueSourceAdapter(private val ext: IReaderCatalogueSource) :
     override suspend fun getChapterList(manga: SManga): List<SChapter> {
         // TODO: if ext.supportsPaginatedChapters() go through all pages
         val chapters = ext.getChapterList(manga.toMangaInfo(), emptyList())
-        return chapters.map { it.toSChapter() }
+        return chapters.map { it.toSChapter() }.reversed()
     }
 
     override suspend fun getMangaDetails(manga: SManga): SManga {
