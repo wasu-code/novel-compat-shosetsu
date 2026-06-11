@@ -7,7 +7,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.launch
 
-val mainHandler = Handler(Looper.getMainLooper())
+val mainHandler by lazy { Handler(Looper.getMainLooper()) }
 
 fun launchIO(block: suspend () -> Unit): Job = CoroutineScope(Dispatchers.IO).launch {
     block()
