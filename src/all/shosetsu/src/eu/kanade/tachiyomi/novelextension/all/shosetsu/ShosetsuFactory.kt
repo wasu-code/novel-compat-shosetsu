@@ -107,10 +107,26 @@ class ShosetsuFactory : SourceFactory {
             ShosetsuSettings().also(::add)
         }
 
+        val addedIds = mutableSetOf<Long>()
         installedExtensions.forEach {
             val (ext, lang) = it
             runCatching {
-                ShosetsuExtensionAdapter(ext, lang).also(::add)
+                val adapter = ShosetsuExtensionAdapter(ext, lang)
+
+                // Skip loading extensions with overlapping IDs.
+                // This guards against crashes on Extension Details screen, were all sources are listed with key=id
+                if (!addedIds.add(adapter.id)) {
+                    mainHandler.post {
+                        Toast.makeText(
+                            hostContext,
+                            "${ext.name} skipped (id already in use)",
+                            Toast.LENGTH_SHORT
+                        ).show()
+                    }
+                    return@forEach
+                }
+
+                add(adapter)
             }.onFailure {
                 mainHandler.post {
                     Toast.makeText(hostContext, "${ext.name} failed to load", Toast.LENGTH_SHORT).show()
