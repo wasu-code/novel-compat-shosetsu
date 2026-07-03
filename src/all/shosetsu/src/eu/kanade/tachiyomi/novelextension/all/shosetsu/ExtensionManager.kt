@@ -6,6 +6,7 @@ import app.shosetsu.lib.Version
 import app.shosetsu.lib.json.RepoExtension
 import app.shosetsu.lib.lua.LuaExtension
 import app.shosetsu.lib.lua.LuaLibrary
+import app.shosetsu.lib.lua.shosetsuGlobals
 import java.io.File
 import java.net.HttpURLConnection
 import java.net.URL
@@ -236,11 +237,19 @@ object ExtensionManager {
         if (libFile.exists()) {
             // compare versions
             val currentVersion = LuaLibrary(libFile).libMetaData.version
-            if (version >= currentVersion) return libFile
+            if (currentVersion >= version) return libFile
         }
 
         val remoteUrl = URL(URL(repoUrl.trimEnd('/') + "/"), "lib/$name.lua")
-        return download(remoteUrl, getLibraryFile(name))
+        return download(remoteUrl, getLibraryFile(name)).also { file ->
+            // load downloaded file
+            if (file != null) {
+                val content = injectLuaPatches(file.readText())
+                val l =
+                    shosetsuGlobals().load(content, "lib($name)")
+                l.call()
+            }
+        }
     }
 
     // FILE SCAN

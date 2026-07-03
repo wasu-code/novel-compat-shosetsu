@@ -89,6 +89,8 @@ class ShosetsuFactory : SourceFactory {
             // what allows checking for updates
             val pendingUpdatesCount = ExtensionRegistry.all().count { it.hasUpdate }
 
+            // TODO: check (or download) libs updates as well
+
             // update timestamp after check
             prefs.edit {
                 putLong("LAST_EXT_CHECK", now)
