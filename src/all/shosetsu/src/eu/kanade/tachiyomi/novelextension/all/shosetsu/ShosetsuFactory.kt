@@ -120,7 +120,7 @@ class ShosetsuFactory : SourceFactory {
                         Toast.makeText(
                             hostContext,
                             "${ext.name} skipped (id already in use)",
-                            Toast.LENGTH_SHORT
+                            Toast.LENGTH_SHORT,
                         ).show()
                     }
                     return@forEach
