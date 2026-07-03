@@ -239,11 +239,6 @@ class ShosetsuExtensionAdapter(private val ext: LuaExtension, language: String) 
 
     override fun getNovelUrl(novel: SNovel): String = ext.expandURL(novel.url, KEY_NOVEL_URL)
 
-    override fun fetchPageList(chapter: SChapter): Observable<List<Page>> {
-        val page = Page(0, chapter.url)
-        return Observable.just(listOf(page))
-    }
-
     override fun pageListParse(response: Response): List<Page> = throw UnsupportedOperationException("Not used")
     override fun imageUrlParse(response: Response): String = throw UnsupportedOperationException("Not used")
 

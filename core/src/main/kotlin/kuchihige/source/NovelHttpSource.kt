@@ -75,7 +75,5 @@ abstract class NovelHttpSource :
     override fun fetchChapterList(novel: SNovel): Observable<List<SChapter>> = super.fetchChapterList(novel)
 
     // fetchPageList is not invoked by host app at all
-    final override fun fetchPageList(chapter: SChapter): Observable<List<Page>> {
-        return super.fetchPageList(chapter)
-    }
+    final override fun fetchPageList(chapter: SChapter): Observable<List<Page>> = super.fetchPageList(chapter)
 }
