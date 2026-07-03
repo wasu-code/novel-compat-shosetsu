@@ -3,6 +3,7 @@ package kuchihige.source
 import eu.kanade.tachiyomi.source.NovelSource
 import eu.kanade.tachiyomi.source.model.FilterList
 import eu.kanade.tachiyomi.source.model.MangasPage
+import eu.kanade.tachiyomi.source.model.Page
 import eu.kanade.tachiyomi.source.model.SChapter
 import eu.kanade.tachiyomi.source.model.SManga
 import eu.kanade.tachiyomi.source.online.HttpSource
@@ -72,4 +73,9 @@ abstract class NovelHttpSource :
 
     @Suppress("PARAMETER_NAME_CHANGED_ON_OVERRIDE")
     override fun fetchChapterList(novel: SNovel): Observable<List<SChapter>> = super.fetchChapterList(novel)
+
+    // fetchPageList is not invoked by host app at all
+    final override fun fetchPageList(chapter: SChapter): Observable<List<Page>> {
+        return super.fetchPageList(chapter)
+    }
 }
