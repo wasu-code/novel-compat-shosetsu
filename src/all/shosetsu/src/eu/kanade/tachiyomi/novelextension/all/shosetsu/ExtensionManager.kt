@@ -178,7 +178,7 @@ object ExtensionManager {
                 }
 
             if (isConflict) {
-                Log.e("ExtensionManager", "Extension ${ext.name} conflicts with an existing extension (same lang+name+formatterID). Download blocked.")
+                Log.e("ExtensionManager", "Extension ${ext.name} conflicts with an existing extension (same lang+name+exMetaData.id). Download blocked.")
                 tempFile.delete()
                 return null
             }

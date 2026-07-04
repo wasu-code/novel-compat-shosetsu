@@ -37,7 +37,7 @@ class ShosetsuExtensionAdapter(private val ext: LuaExtension, language: String) 
     override val lang: String = language
     override val supportsLatest: Boolean = ext.listings.size > 1
     override val name: String = ext.name
-    override val versionId: Int = ext.formatterID
+    override val versionId: Int = ext.exMetaData.id
 
     val preferences = getPreferences(id)
     private val handler by lazy { Handler(Looper.getMainLooper()) }
@@ -340,7 +340,7 @@ class ShosetsuExtensionAdapter(private val ext: LuaExtension, language: String) 
                 summary = try {
                     val meta = ext.exMetaData
                     """
-                        internal ID: ${ext.formatterID}
+                        internal ID: ${ext.exMetaData.id}
                         version: ${meta.version} (library version ${meta.libVersion})
                         created by: ${meta.author}
                         depends on: ${meta.dependencies.entries.joinToString { it.key + " v" + it.value }}
