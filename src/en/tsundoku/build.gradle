@@ -1,0 +1,8 @@
+ext {
+    extName = "Tsundoku Docs"
+    extClass = ".TsundokuDocs"
+    extVersionCode = 1
+    isNovel = true
+}
+
+apply from: "$rootDir/common.gradle"
