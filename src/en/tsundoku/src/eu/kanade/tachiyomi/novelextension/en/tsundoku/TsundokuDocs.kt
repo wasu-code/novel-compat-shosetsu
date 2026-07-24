@@ -19,6 +19,10 @@ class TsundokuDocs :
     override val supportsLatest: Boolean = false
     override val name: String = "Tsundoku Docs"
 
+//    private val dateFormat = SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss.SSS'Z'", Locale.ROOT).apply {
+//        timeZone = TimeZone.getTimeZone("UTC")
+//    }
+
     override fun popularNovelsRequest(page: Int): Request = GET("$baseUrl/docs/guides/getting-started")
 
     override fun popularNovelsParse(response: Response): NovelsPage {
@@ -39,6 +43,9 @@ class TsundokuDocs :
             thumbnail_url = doc.selectFirst("meta[property=og:image]")?.attr("content")
             description = doc.selectFirst("meta[property=og:description]")?.attr("content")
             update_strategy = UpdateStrategy.ONLY_FETCH_ONCE
+//            memo = buildJsonObject {
+//                put("date_upload", doc.selectFirst(".VPLastUpdated time")?.attr("datetime"))
+//            }
         }
     }
 
@@ -46,6 +53,7 @@ class TsundokuDocs :
         SChapter.create().apply {
             name = novel.title
             url = novel.url
+//            date_upload = dateFormat.tryParse(novel.memo["date_upload"])
         },
     )
 
@@ -53,7 +61,7 @@ class TsundokuDocs :
         val response = client.newCall(GET(baseUrl + page.url, headers)).execute()
         val doc = response.asJsoup()
 
-        val main = doc.selectFirst(".main") ?: return ""
+        val main = doc.selectFirst(".main")!!
 
         main.prepend(
             """
