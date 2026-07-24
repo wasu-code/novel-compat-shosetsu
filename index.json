@@ -20,5 +20,24 @@
     "nsfw": 0,
     "isNovel": true,
     "sources": []
+  },
+  {
+    "name": "NovelApp: Tsundoku Docs",
+    "pkg": "eu.kanade.tachiyomi.novelextension.en.tsundoku",
+    "apk": "tsundoku-en.tsundoku-v1.4.1.apk",
+    "lang": "en\nv1",
+    "code": 1,
+    "version": "1.4.1",
+    "nsfw": 0,
+    "isNovel": true,
+    "sources": [
+      {
+        "name": "Tsundoku Docs",
+        "lang": "en",
+        "id": "6305848832713350451",
+        "baseUrl": "https://tsundoku-otaku.github.io",
+        "versionId": 1
+      }
+    ]
   }
 ]
