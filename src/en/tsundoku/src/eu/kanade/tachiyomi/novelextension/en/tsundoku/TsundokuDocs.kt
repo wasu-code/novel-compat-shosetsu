@@ -5,6 +5,7 @@ import eu.kanade.tachiyomi.source.NovelSource
 import eu.kanade.tachiyomi.source.model.FilterList
 import eu.kanade.tachiyomi.source.model.Page
 import eu.kanade.tachiyomi.source.model.SChapter
+import eu.kanade.tachiyomi.source.model.SManga
 import eu.kanade.tachiyomi.source.model.UpdateStrategy
 import eu.kanade.tachiyomi.util.asJsoup
 import kuchihige.source.NovelHttpSource
@@ -43,6 +44,7 @@ class TsundokuDocs :
             thumbnail_url = doc.selectFirst("meta[property=og:image]")?.attr("content")
             description = doc.selectFirst("meta[property=og:description]")?.attr("content")
             update_strategy = UpdateStrategy.ONLY_FETCH_ONCE
+            status = SManga.COMPLETED
 //            memo = buildJsonObject {
 //                put("date_upload", doc.selectFirst(".VPLastUpdated time")?.attr("datetime"))
 //            }
