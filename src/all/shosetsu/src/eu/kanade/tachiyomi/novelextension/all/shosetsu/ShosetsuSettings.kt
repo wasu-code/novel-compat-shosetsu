@@ -7,6 +7,7 @@ import android.content.Intent
 import android.util.Log
 import android.widget.EditText
 import androidx.core.net.toUri
+import androidx.preference.CheckBoxPreference
 import androidx.preference.EditTextPreference
 import androidx.preference.MultiSelectListPreference
 import androidx.preference.Preference
@@ -66,6 +67,7 @@ class ShosetsuSettings :
         var repos: Set<String> = emptySet(),
         var query: String = "",
         var languages: Set<String> = emptySet(),
+        var showId: Boolean = false,
     )
 
     override fun setupPreferenceScreen(screen: PreferenceScreen) {
@@ -103,6 +105,13 @@ class ShosetsuSettings :
             summary = "Add URLs of repositories providing Shosetsu extensions"
             dialogTitle = "Repositories URLs"
             dialogMessage = "One per line"
+        }.also(screen::addPreference)
+
+        val showID = CheckBoxPreference(screen.context).apply {
+            key = "SHOW_ID"
+            title = "Show IDs"
+            summary = "Show extension IDs on the list"
+            setDefaultValue(false)
         }.also(screen::addPreference)
 
         val filterCategory = PreferenceCategory(screen.context).apply {
@@ -200,6 +209,12 @@ class ShosetsuSettings :
             true
         }
 
+        showID.setOnPreferenceChangeListener { _, newValue ->
+            filters.showId = newValue as Boolean
+            updateExtensionList(screen, filters)
+            true
+        }
+
         enabledRepos.setOnPreferenceChangeListener { _, newValue ->
             @Suppress("unchecked_cast")
             filters.repos = newValue as Set<String>
@@ -219,6 +234,7 @@ class ShosetsuSettings :
             this.allRepos = parseRepos(allRepos.text ?: "")
             this.repos = enabledRepos.values
             this.languages = enabledLanguages.values
+            this.showId = showID.isChecked
         }
         updateExtensionList(screen, filters)
     }
@@ -286,7 +302,7 @@ class ShosetsuSettings :
                                     .thenByDescending { it.isInstalled }
                                     .thenBy { it.name },
                             ).forEach { ext ->
-                                category.addPreference(createExtensionPreference(context, ext))
+                                category.addPreference(createExtensionPreference(context, ext, current.showId))
                             }
                         }
                     }
@@ -330,7 +346,7 @@ class ShosetsuSettings :
                     }.also(screen::addPreference)
 
                     orphanedExtensions.forEach { ext ->
-                        orphanedCategory.addPreference(createExtensionPreference(context, ext))
+                        orphanedCategory.addPreference(createExtensionPreference(context, ext, current.showId))
                     }
                 }
             }
@@ -340,10 +356,11 @@ class ShosetsuSettings :
     private fun createExtensionPreference(
         context: Context,
         ext: ShosetsuExtension,
+        showId: Boolean,
     ): Preference = newPreference(context) {
         title = ext.name
         summary = """
-            ${ext.lang} • ${ext.getVersionString()}
+            ${ext.lang} • ${ext.getVersionString()} ${if (showId) " • 🆔 ${ext.id}" else ""}
         """.trimIndent()
         updateExtensionIcon(ext.getState())
 

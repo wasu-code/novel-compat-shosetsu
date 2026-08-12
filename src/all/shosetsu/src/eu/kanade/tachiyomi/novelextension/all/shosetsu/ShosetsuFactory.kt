@@ -14,6 +14,7 @@ import eu.kanade.tachiyomi.source.SourceFactory
 import keiyoushi.utils.getPreferences
 import kuchihige.utils.launchIO
 import kuchihige.utils.mainHandler
+import org.json.JSONObject
 import uy.kohesive.injekt.Injekt
 import uy.kohesive.injekt.api.get
 
@@ -56,9 +57,22 @@ class ShosetsuFactory : SourceFactory {
     // Local metadata is added during execution of loadLueExtension().
     val installedExtensions = withExtensionClassLoader(javaClass.classLoader!!) {
         ExtensionManager.getInstalledExtensionsFiles()
-            .map { file ->
-                val ext = ShosetsuExtension.fromFile(file)
-                ext.loadLuaExtension() to ext.lang
+            .mapNotNull { file ->
+                runCatching {
+                    val ext = ShosetsuExtension.fromFile(file)
+                    ext.loadLuaExtension() to ext.lang
+                }.onFailure { _ ->
+                    val firstLine = file.useLines { it.firstOrNull() } ?: ""
+                    val json = firstLine.removePrefix("--").trim()
+                    val id = JSONObject(json).getLong("id")
+                    mainHandler.post {
+                        Toast.makeText(
+                            hostContext,
+                            "Shosetsu: Failed to load ext with id $id",
+                            Toast.LENGTH_LONG,
+                        ).show()
+                    }
+                }.getOrNull()
             }
 //          .plus(LuaExtension(injectLuaPatches(EXT), "DebugExt") to "all")
     }
